@@ -3,6 +3,7 @@
 // 익명성 규칙 (docs/anonymity.md):
 //   - 규칙 1: 어떤 테이블에도 작성자 식별자 컬럼을 두지 않는다. 글 내용과 뭉갠 시각만 저장한다.
 //   - 규칙 4: 작성 시각은 저장할 때 시간 단위로 내림한다. 정확한 시각은 DB 어디에도 남지 않는다.
+//   - 규칙 9: 투표는 portal 이 만든 글마다 다른 해시(voter)로만 구분한다. 투표 시각은 저장하지 않는다.
 
 package board
 
@@ -36,6 +37,15 @@ type Post struct {
 	Body         string    `json:"body,omitempty"`
 	CreatedAt    time.Time `json:"createdAt"`
 	CommentCount int       `json:"commentCount"`
+	Likes        int       `json:"likes"`
+	Dislikes     int       `json:"dislikes"`
+}
+
+// Votes 는 투표 뒤 화면에 다시 그릴 값이다. Mine 은 요청한 voter 의 표 (1, -1, 0).
+type Votes struct {
+	Likes    int `json:"likes"`
+	Dislikes int `json:"dislikes"`
+	Mine     int `json:"mine"`
 }
 
 type Comment struct {
@@ -65,7 +75,20 @@ CREATE TABLE IF NOT EXISTS comments (
 	created_at INTEGER NOT NULL -- unix 초, 시간 단위로 내림
 );
 CREATE INDEX IF NOT EXISTS comments_post_id ON comments(post_id, id);
+-- voter 는 HMAC(portal 비밀키, userId:postId) 의 hex. 글마다 달라서 한 사람의 표끼리 묶을 수 없다.
+-- WITHOUT ROWID: 행이 (post_id, voter) 순서로만 저장되어 누가 먼저 눌렀는지 순서가 남지 않는다.
+CREATE TABLE IF NOT EXISTS votes (
+	post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+	voter   TEXT    NOT NULL,
+	value   INTEGER NOT NULL CHECK (value IN (1, -1)),
+	PRIMARY KEY (post_id, voter)
+) WITHOUT ROWID;
 `
+
+// 글 하나의 좋아요 / 싫어요 수. posts 를 p 로 부르는 쿼리 안에서 쓴다.
+const voteCounts = `
+	(SELECT COUNT(*) FROM votes v WHERE v.post_id = p.id AND v.value = 1),
+	(SELECT COUNT(*) FROM votes v WHERE v.post_id = p.id AND v.value = -1)`
 
 // Open 은 path 의 SQLite 파일을 열고 (없으면 만들고) 스키마를 맞춘다.
 func Open(path string) (*Store, error) {
@@ -125,7 +148,7 @@ func (s *Store) CreatePost(ctx context.Context, title, body string) (Post, error
 // ListPosts 는 최신 글부터 limit 개를 돌려준다. 본문은 빼고 댓글 수를 붙인다.
 func (s *Store) ListPosts(ctx context.Context, limit int) ([]Post, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT p.id, p.title, p.created_at, (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id)
+		SELECT p.id, p.title, p.created_at, (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id),`+voteCounts+`
 		FROM posts p ORDER BY p.id DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
@@ -136,7 +159,7 @@ func (s *Store) ListPosts(ctx context.Context, limit int) ([]Post, error) {
 	for rows.Next() {
 		var p Post
 		var at int64
-		if err := rows.Scan(&p.ID, &p.Title, &at, &p.CommentCount); err != nil {
+		if err := rows.Scan(&p.ID, &p.Title, &at, &p.CommentCount, &p.Likes, &p.Dislikes); err != nil {
 			return nil, err
 		}
 		p.CreatedAt = time.Unix(at, 0).UTC()
@@ -149,8 +172,8 @@ func (s *Store) GetPost(ctx context.Context, id int64) (Post, error) {
 	var p Post
 	var at int64
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, title, body, created_at, (SELECT COUNT(*) FROM comments WHERE post_id = posts.id)
-		FROM posts WHERE id = ?`, id).Scan(&p.ID, &p.Title, &p.Body, &at, &p.CommentCount)
+		SELECT p.id, p.title, p.body, p.created_at, (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id),`+voteCounts+`
+		FROM posts p WHERE p.id = ?`, id).Scan(&p.ID, &p.Title, &p.Body, &at, &p.CommentCount, &p.Likes, &p.Dislikes)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Post{}, ErrNotFound
 	}
@@ -204,4 +227,71 @@ func (s *Store) CreateComment(ctx context.Context, postID int64, body string) (C
 		return Comment{}, err
 	}
 	return Comment{ID: id, PostID: postID, Body: body, CreatedAt: time.Unix(at, 0).UTC()}, nil
+}
+
+// validVoter 는 voter 가 SHA-256 hex (소문자 64 글자) 인지 본다.
+// portal 이 실수로 이메일 같은 원래 값을 보내도 저장되지 않게 하는 마지막 방어선이다.
+func validVoter(v string) bool {
+	if len(v) != 64 {
+		return false
+	}
+	for _, c := range v {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+// MyVote 는 voter 가 글에 준 표를 돌려준다. 안 눌렀거나 voter 가 비어 있으면 0.
+func (s *Store) MyVote(ctx context.Context, postID int64, voter string) (int, error) {
+	if !validVoter(voter) {
+		return 0, nil
+	}
+	var v int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT value FROM votes WHERE post_id = ? AND voter = ?`, postID, voter).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	return v, err
+}
+
+// Vote 는 voter 의 표를 value 로 바꾼다. 1 = 좋아요, -1 = 싫어요, 0 = 취소.
+// 같은 voter 는 글마다 한 표뿐이라, 좋아요를 누른 채 싫어요를 누르면 싫어요로 바뀐다.
+func (s *Store) Vote(ctx context.Context, postID int64, voter string, value int) (Votes, error) {
+	if !validVoter(voter) || value < -1 || value > 1 {
+		return Votes{}, ErrInvalid
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Votes{}, err
+	}
+	defer tx.Rollback()
+
+	var exists bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM posts WHERE id = ?)`, postID).Scan(&exists); err != nil {
+		return Votes{}, err
+	}
+	if !exists {
+		return Votes{}, ErrNotFound
+	}
+
+	if value == 0 {
+		_, err = tx.ExecContext(ctx, `DELETE FROM votes WHERE post_id = ? AND voter = ?`, postID, voter)
+	} else {
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO votes (post_id, voter, value) VALUES (?, ?, ?)
+			ON CONFLICT (post_id, voter) DO UPDATE SET value = excluded.value`, postID, voter, value)
+	}
+	if err != nil {
+		return Votes{}, err
+	}
+
+	out := Votes{Mine: value}
+	if err := tx.QueryRowContext(ctx, `SELECT`+voteCounts+` FROM posts p WHERE p.id = ?`, postID).
+		Scan(&out.Likes, &out.Dislikes); err != nil {
+		return Votes{}, err
+	}
+	return out, tx.Commit()
 }

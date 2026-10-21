@@ -9,7 +9,12 @@ export type Post = {
 	body?: string; // 목록에서는 빠진다
 	createdAt: string; // 시간 단위로 뭉갠 시각 (docs/anonymity.md 규칙 4)
 	commentCount: number;
+	likes: number;
+	dislikes: number;
 };
+
+// 투표 결과. mine 은 내가 준 표: 1 = 좋아요, -1 = 싫어요, 0 = 안 누름.
+export type Votes = { likes: number; dislikes: number; mine: number };
 
 export type Comment = {
 	id: number;

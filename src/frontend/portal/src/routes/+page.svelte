@@ -3,6 +3,7 @@
 	import List from '@lucide/svelte/icons/list';
 	import MessageSquare from '@lucide/svelte/icons/message-square';
 	import PenLine from '@lucide/svelte/icons/pen-line';
+	import ThumbsUp from '@lucide/svelte/icons/thumbs-up';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import PanelHeader from '$lib/components/PanelHeader.svelte';
 	import { formatHour } from '$lib/board';
@@ -40,6 +41,11 @@
 							<span
 								class="flex shrink-0 items-center gap-3 text-xs text-muted-foreground tabular-nums"
 							>
+								{#if p.likes > 0}
+									<span class="flex items-center gap-1" title="좋아요 {p.likes}개">
+										<ThumbsUp class="size-3.5" />{p.likes}
+									</span>
+								{/if}
 								{#if p.commentCount > 0}
 									<span class="flex items-center gap-1" title="댓글 {p.commentCount}개">
 										<MessageSquare class="size-3.5" />{p.commentCount}

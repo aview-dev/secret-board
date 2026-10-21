@@ -2,6 +2,8 @@
 	import { enhance } from '$app/forms';
 	import Clock from '@lucide/svelte/icons/clock';
 	import MessageSquare from '@lucide/svelte/icons/message-square';
+	import ThumbsDown from '@lucide/svelte/icons/thumbs-down';
+	import ThumbsUp from '@lucide/svelte/icons/thumbs-up';
 	import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 	import PanelHeader from '$lib/components/PanelHeader.svelte';
 	import { MAX_COMMENT_LEN, formatHour } from '$lib/board';
@@ -9,6 +11,14 @@
 
 	let { data, form } = $props();
 	let submitting = $state(false);
+	let voting = $state(false);
+
+	// 고른 표는 색으로 구분한다. 좋아요는 강조색, 싫어요는 붉은 계열.
+	const VOTE_BUTTON =
+		'inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-sm font-medium tabular-nums transition-all disabled:opacity-50 [&_svg]:size-4';
+	const VOTE_IDLE = 'bg-control text-muted-foreground hover:text-foreground hover:brightness-95';
+	const LIKE_ON = 'border-primary bg-primary/10 text-primary';
+	const DISLIKE_ON = 'border-error-border bg-error-bg text-error-fg';
 </script>
 
 <main class="mx-auto max-w-3xl space-y-4 px-4 py-8">
@@ -25,6 +35,45 @@
 		<div class="px-6 py-5 text-base leading-relaxed break-words whitespace-pre-wrap">
 			{data.post.body}
 		</div>
+		<form
+			method="POST"
+			action="?/vote"
+			use:enhance={() => {
+				voting = true;
+				return async ({ update }) => {
+					await update();
+					voting = false;
+				};
+			}}
+			class="flex flex-wrap items-center gap-2 border-t px-6 py-3"
+		>
+			<!-- 이미 누른 버튼을 다시 누르면 0 (취소) 을 보낸다. -->
+			<button
+				name="value"
+				value={data.myVote === 1 ? 0 : 1}
+				disabled={voting}
+				aria-pressed={data.myVote === 1}
+				title={data.myVote === 1 ? '좋아요 취소' : '좋아요'}
+				class="{VOTE_BUTTON} {data.myVote === 1 ? LIKE_ON : VOTE_IDLE}"
+			>
+				<ThumbsUp />{data.post.likes}
+			</button>
+			<button
+				name="value"
+				value={data.myVote === -1 ? 0 : -1}
+				disabled={voting}
+				aria-pressed={data.myVote === -1}
+				title={data.myVote === -1 ? '싫어요 취소' : '싫어요'}
+				class="{VOTE_BUTTON} {data.myVote === -1 ? DISLIKE_ON : VOTE_IDLE}"
+			>
+				<ThumbsDown />{data.post.dislikes}
+			</button>
+			{#if form?.voteMessage}
+				<span class="text-xs text-error-fg">{form.voteMessage}</span>
+			{:else}
+				<span class="text-xs text-muted-foreground">누가 눌렀는지는 저장되지 않습니다.</span>
+			{/if}
+		</form>
 	</article>
 
 	<section class={PANEL}>

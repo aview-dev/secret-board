@@ -37,6 +37,7 @@ func NewServer(cfg Config) http.Handler {
 	api.HandleFunc("POST /api/v1/posts", h.createPost)
 	api.HandleFunc("GET /api/v1/posts/{id}", h.getPost)
 	api.HandleFunc("POST /api/v1/posts/{id}/comments", h.createComment)
+	api.HandleFunc("PUT /api/v1/posts/{id}/vote", h.vote)
 	mux.Handle("/api/", requirePortalSecret(cfg.PortalSecret, api))
 
 	return mux
@@ -72,6 +73,7 @@ func (h *handlers) createPost(w http.ResponseWriter, r *http.Request) {
 }
 
 // getPost 는 글 하나와 댓글 전체를 함께 돌려준다 (상세 화면이 한 번에 그리도록).
+// X-Voter 헤더가 있으면 그 voter 의 표(myVote)도 붙인다. voter 는 글마다 다른 해시다 (규칙 9).
 func (h *handlers) getPost(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r)
 	if !ok {
@@ -87,7 +89,12 @@ func (h *handlers) getPost(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"post": p, "comments": comments})
+	myVote, err := h.store.MyVote(r.Context(), id, r.Header.Get("X-Voter"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"post": p, "comments": comments, "myVote": myVote})
 }
 
 func (h *handlers) createComment(w http.ResponseWriter, r *http.Request) {
@@ -107,6 +114,27 @@ func (h *handlers) createComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, c)
+}
+
+// vote 는 좋아요(1) / 싫어요(-1) / 취소(0) 를 받는다. voter 는 portal 이 만든 해시만 온다.
+func (h *handlers) vote(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Voter string `json:"voter"`
+		Value int    `json:"value"`
+	}
+	if !readJSON(w, r, &in) {
+		return
+	}
+	v, err := h.store.Vote(r.Context(), id, in.Voter, in.Value)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
 }
 
 func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {

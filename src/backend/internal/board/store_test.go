@@ -85,3 +85,74 @@ func TestValidation(t *testing.T) {
 		t.Fatalf("missing post: got %v", err)
 	}
 }
+
+func TestVote(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	p, _ := s.CreatePost(ctx, "글", "본문")
+	alice := strings.Repeat("a", 64)
+	bob := strings.Repeat("b", 64)
+
+	check := func(got Votes, likes, dislikes, mine int) {
+		t.Helper()
+		if got.Likes != likes || got.Dislikes != dislikes || got.Mine != mine {
+			t.Fatalf("got %+v, want likes=%d dislikes=%d mine=%d", got, likes, dislikes, mine)
+		}
+	}
+
+	v, err := s.Vote(ctx, p.ID, alice, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check(v, 1, 0, 1)
+
+	// 같은 사람이 다시 눌러도 한 표뿐이다.
+	v, _ = s.Vote(ctx, p.ID, alice, 1)
+	check(v, 1, 0, 1)
+
+	// 좋아요에서 싫어요로 바꾸기.
+	v, _ = s.Vote(ctx, p.ID, alice, -1)
+	check(v, 0, 1, -1)
+
+	v, _ = s.Vote(ctx, p.ID, bob, 1)
+	check(v, 1, 1, 1)
+
+	// 취소.
+	v, _ = s.Vote(ctx, p.ID, alice, 0)
+	check(v, 1, 0, 0)
+
+	got, _ := s.GetPost(ctx, p.ID)
+	if got.Likes != 1 || got.Dislikes != 0 {
+		t.Fatalf("GetPost counts: %+v", got)
+	}
+	posts, _ := s.ListPosts(ctx, 10)
+	if posts[0].Likes != 1 {
+		t.Fatalf("ListPosts likes: %+v", posts[0])
+	}
+	if mine, _ := s.MyVote(ctx, p.ID, bob); mine != 1 {
+		t.Fatalf("MyVote bob: got %d", mine)
+	}
+	if mine, _ := s.MyVote(ctx, p.ID, alice); mine != 0 {
+		t.Fatalf("MyVote alice: got %d", mine)
+	}
+}
+
+func TestVoteRejectsBadInput(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	p, _ := s.CreatePost(ctx, "글", "본문")
+	ok := strings.Repeat("a", 64)
+
+	// voter 는 해시만 받는다. 이메일 같은 원래 값은 거절한다.
+	for _, voter := range []string{"", "someone@corelinesoft.com", strings.Repeat("A", 64), strings.Repeat("a", 63)} {
+		if _, err := s.Vote(ctx, p.ID, voter, 1); !errors.Is(err, ErrInvalid) {
+			t.Fatalf("voter %q: got %v, want ErrInvalid", voter, err)
+		}
+	}
+	if _, err := s.Vote(ctx, p.ID, ok, 2); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("value 2: got %v", err)
+	}
+	if _, err := s.Vote(ctx, 9999, ok, 1); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing post: got %v", err)
+	}
+}

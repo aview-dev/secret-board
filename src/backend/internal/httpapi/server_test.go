@@ -74,3 +74,40 @@ func TestCreatePostAndComment(t *testing.T) {
 		t.Fatalf("get post: got %d %s", rec.Code, rec.Body)
 	}
 }
+
+func TestVote(t *testing.T) {
+	h := newTestServer(t, "")
+	voter := strings.Repeat("c", 64)
+
+	do := func(method, path, body string, header map[string]string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, path, strings.NewReader(body))
+		for k, v := range header {
+			req.Header.Set(k, v)
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+
+	do("POST", "/api/v1/posts", `{"title":"t","body":"b"}`, nil)
+
+	rec := do("PUT", "/api/v1/posts/1/vote", `{"voter":"`+voter+`","value":1}`, nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"likes":1`) {
+		t.Fatalf("vote: got %d %s", rec.Code, rec.Body)
+	}
+	if rec := do("PUT", "/api/v1/posts/1/vote", `{"voter":"me@corelinesoft.com","value":1}`, nil); rec.Code != http.StatusBadRequest {
+		t.Fatalf("raw email as voter: got %d", rec.Code)
+	}
+	if rec := do("PUT", "/api/v1/posts/42/vote", `{"voter":"`+voter+`","value":1}`, nil); rec.Code != http.StatusNotFound {
+		t.Fatalf("vote on missing post: got %d", rec.Code)
+	}
+
+	rec = do("GET", "/api/v1/posts/1", "", map[string]string{"X-Voter": voter})
+	if !strings.Contains(rec.Body.String(), `"myVote":1`) {
+		t.Fatalf("get post with voter: %s", rec.Body)
+	}
+	rec = do("GET", "/api/v1/posts/1", "", nil)
+	if !strings.Contains(rec.Body.String(), `"myVote":0`) {
+		t.Fatalf("get post without voter: %s", rec.Body)
+	}
+}
