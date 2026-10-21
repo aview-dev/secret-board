@@ -1,0 +1,11 @@
+# Single source of truth for the secret-board version.
+#
+# Sourced by:
+#   - Makefile                        (export to dev runs, Go ldflags)
+#   - docker/build-docker-images.sh   (image tag)
+#   - .github/workflows/ci.yml        (image tag on release)
+#
+# Override per-run with `SECRET_BOARD_VERSION=... make ...`.
+# Bumping happens here, in a single commit. Tag the bump commit (vX.Y.Z) for releases.
+
+SECRET_BOARD_VERSION=0.1.0

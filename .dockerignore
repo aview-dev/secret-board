@@ -1,0 +1,24 @@
+# Build context for docker/Dockerfile is the repo root. Without this file
+# `COPY src/frontend/portal/ ./` drops the host's node_modules on top of the
+# image's own frozen install. Keep host build output and secrets out.
+
+**/node_modules/
+**/.svelte-kit/
+**/vol/
+src/frontend/portal/build/
+/build/
+
+.git/
+.github/
+.claude/
+/logs/
+
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.db
+*.db-*
+
+.DS_Store
+Thumbs.db

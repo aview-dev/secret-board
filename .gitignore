@@ -1,0 +1,23 @@
+/build/
+**/vol/
+**/node_modules/
+/logs/
+
+# secrets - .env.example 만 커밋한다
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+
+# local sqlite databases (auth.db, board.db)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code scheduled-task runtime lock
+.claude/scheduled_tasks.lock

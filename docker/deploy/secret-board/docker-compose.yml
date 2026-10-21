@@ -1,0 +1,59 @@
+# secret-board deployment. Variables come from
+# a .env file next to this compose file - start from .env.example.
+#
+# First run:
+#   cp .env.example .env            # then fill in the secrets
+#   docker compose up -d
+#
+# Only the portal is exposed. Put TLS in front of it (company reverse proxy or
+# a load balancer); the backend stays internal to the compose network.
+#
+# Logging: json-file with a small cap. Neither service writes per-request
+# access logs (docs/anonymity.md), so these hold startup / error lines only.
+
+services:
+  ######################################################################################################################
+  # backend (posts / comments; never receives user identity)
+  backend:
+    image: ${IMAGE_REPO:-secret-board}:${SECRET_BOARD_VERSION}
+    environment:
+      SECRET_BOARD_SERVER_ADDRESS: :8080
+      SECRET_BOARD_BACKEND_SECRET: ${SECRET_BOARD_BACKEND_SECRET}
+      TZ: ${TIMEZONE:-Asia/Seoul}
+    volumes:
+      - ./vol/backend:/var/secret-board/backend
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 3
+
+  ######################################################################################################################
+  # portal (SvelteKit BFF + Google sign-in, the ONLY exposed service)
+  portal:
+    image: ${IMAGE_REPO:-secret-board}:${SECRET_BOARD_VERSION}-portal
+    ports:
+      - "${PORTAL_PORT:-3000}:3000"
+    environment:
+      # adapter-node: ORIGIN must match the public URL users open.
+      PORT: 3000
+      ORIGIN: ${PORTAL_ORIGIN}
+      BETTER_AUTH_URL: ${PORTAL_ORIGIN}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      ALLOWED_DOMAIN: ${ALLOWED_DOMAIN:-corelinesoft.com}
+      SECRET_BOARD_BACKEND_URL: http://backend:8080
+      SECRET_BOARD_BACKEND_SECRET: ${SECRET_BOARD_BACKEND_SECRET}
+      TZ: ${TIMEZONE:-Asia/Seoul}
+    volumes:
+      - ./vol/portal:/var/secret-board/portal
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 3
+    depends_on:
+      - backend
