@@ -21,14 +21,29 @@ export function isAllowedEmail(email: string | null | undefined): boolean {
 	return !!email && email.toLowerCase().endsWith('@' + ALLOWED_DOMAIN);
 }
 
+// ADMIN_EMAILS(쉼표로 구분)에 적힌 계정은 DB의 role 과 상관없이 항상 관리자다.
+// 관리자 화면에서 강등할 수 없어서, 관리자가 한 명도 남지 않는 상황을 막는다.
+const ADMIN_EMAILS = new Set(
+	(env.ADMIN_EMAILS || '')
+		.split(',')
+		.map((e) => e.trim().toLowerCase())
+		.filter(Boolean)
+);
+
+export function isFixedAdmin(email: string): boolean {
+	return ADMIN_EMAILS.has(email.toLowerCase());
+}
+
 export const googleConfigured = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+
+export const db = building ? undefined : new DatabaseSync(env.AUTH_DB_PATH || 'auth.db');
 
 const options = {
 	baseURL: env.BETTER_AUTH_URL || undefined,
 	secret: env.BETTER_AUTH_SECRET,
 	// `vite build`는 서버 모듈을 import해서 분석한다. 그때 DB 파일이 생기지 않도록
 	// 빌드 중에는 database를 비워 둔다 (better-auth가 메모리 어댑터로 대신한다).
-	database: building ? undefined : new DatabaseSync(env.AUTH_DB_PATH || 'auth.db'),
+	database: db,
 	socialProviders: googleConfigured
 		? {
 				google: {
@@ -40,6 +55,12 @@ const options = {
 				}
 			}
 		: {},
+	user: {
+		// 역할. 기본은 user 이고, 관리자 화면에서만 바꾼다 (input: false 라서 가입 요청으로는 못 정한다).
+		additionalFields: {
+			role: { type: 'string' as const, required: false, defaultValue: 'user', input: false }
+		}
+	},
 	databaseHooks: {
 		user: {
 			create: {
@@ -49,16 +70,28 @@ const options = {
 					}
 				}
 			}
+		},
+		// 세션에 User-Agent를 남기지 않는다. 로그인 시각과 기기 정보를 글 작성 시각과
+		// 맞춰 보는 단서가 되기 때문이다 (docs/anonymity.md 규칙 5).
+		session: {
+			create: {
+				before: async (session: Record<string, unknown>) => ({
+					data: { ...session, ipAddress: null, userAgent: null }
+				})
+			}
 		}
 	},
-	rateLimit: { window: 60, max: 10 },
+	// IP도 수집하지 않는다. 이 때문에 better-auth의 IP 기준 rate limit은 동작하지 않는다.
+	advanced: { ipAddress: { disableIpTracking: true } },
 	session: { cookieCache: { enabled: true, maxAge: 60 } }
 };
 
-// 서버가 뜰 때 auth 테이블(user, session, account, verification)을 만든다.
+// 서버가 뜰 때 auth 테이블(user, session, account, verification)을 만들고, 추가된 컬럼(user.role)을 붙인다.
 if (!building) {
 	const { runMigrations } = await getMigrations(options);
 	await runMigrations();
+	// 위 설정 전에 만들어진 세션에 남아 있던 값을 지운다.
+	db!.exec('UPDATE session SET ipAddress = NULL, userAgent = NULL');
 }
 
 export const auth = betterAuth(options);

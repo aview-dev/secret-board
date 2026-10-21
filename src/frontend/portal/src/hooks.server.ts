@@ -1,8 +1,9 @@
-import { redirect, type Handle } from '@sveltejs/kit';
+import { error, redirect, type Handle } from '@sveltejs/kit';
 import { building } from '$app/environment';
 import { sequence } from '@sveltejs/kit/hooks';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { auth, isAllowedEmail } from '$lib/server/auth';
+import { roleOf } from '$lib/server/users';
 
 const handleAuth: Handle = async ({ event, resolve }) => {
 	const result = await auth.api.getSession({ headers: event.request.headers });
@@ -10,6 +11,7 @@ const handleAuth: Handle = async ({ event, resolve }) => {
 	const ok = result && isAllowedEmail(result.user.email);
 	event.locals.user = ok ? result.user : null;
 	event.locals.session = ok ? result.session : null;
+	event.locals.role = ok ? roleOf(result.user) : null;
 	return resolve(event);
 };
 
@@ -25,6 +27,9 @@ const handleGuard: Handle = async ({ event, resolve }) => {
 		redirect(307, `/login?next=${next}`);
 	}
 	if (event.locals.user && isPublic) redirect(307, '/');
+	// /admin 아래는 관리자만. 페이지 load 와 form action 모두 여기를 지난다.
+	if (id.startsWith('/admin') && event.locals.role !== 'admin')
+		error(403, '관리자만 볼 수 있습니다.');
 	return resolve(event);
 };
 
