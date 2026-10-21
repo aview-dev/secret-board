@@ -1,1 +1,105 @@
 @import 'tailwindcss';
+
+/* aviewops portal 의 "hairline" 테마에서 필요한 토큰만 옮겨 왔다.
+   깊이는 그림자 대신 1px 선과 아주 작은 배경 단계로 만든다.
+   강조색(primary)은 드물게 쓴다: 주요 버튼, 포커스 링, 로고 막대 정도. */
+:root {
+	--font-sans:
+		system-ui, -apple-system, 'Segoe UI', 'Noto Sans KR', 'Apple SD Gothic Neo', Roboto, sans-serif;
+	--radius: 8px;
+
+	--background: oklch(1 0 0);
+	--foreground: oklch(0.18 0.008 255);
+	/* 상단 바: 남색 판. 바 위의 글자 / 선은 페이지 색이 아니라 topbar-* 만 쓴다. */
+	--topbar: oklch(0.28 0.045 262);
+	--topbar-foreground: oklch(0.97 0.005 262);
+	--topbar-muted: oklch(0.77 0.02 262);
+	--topbar-border: oklch(0.39 0.04 262);
+	--topbar-edge: oklch(0.45 0.09 262);
+	--topbar-mark: oklch(0.765 0.152 169.6);
+	/* 층: 바닥(app-ground) 위에 패널(panel)이 뜨고, 패널 머리(panel-header)는 한 단계 어둡다. */
+	--app-ground: oklch(0.976 0.003 250);
+	--panel: oklch(1 0 0);
+	--panel-header: oklch(0.958 0.008 250);
+	--primary: oklch(0.55 0.07 169.6);
+	--primary-foreground: oklch(1 0 0);
+	--control: oklch(0.99 0.002 250);
+	--muted: oklch(0.968 0.004 250);
+	--muted-foreground: oklch(0.5 0.014 255);
+	--border: oklch(0.888 0.005 253);
+	--ring: oklch(0.55 0.07 169.6);
+	--row-hover: oklch(0.963 0.006 250);
+	--row-accent: oklch(0.65 0.09 169.6);
+	--error-bg: oklch(0.55 0.19 27 / 12%);
+	--error-fg: oklch(0.51 0.19 27);
+	--error-border: oklch(0.55 0.19 27 / 22%);
+}
+
+@theme inline {
+	/* html 이 14px 이라 px 로 적는다. 단계마다 줄 높이를 같이 정한다. */
+	--text-2xs: 11px;
+	--text-2xs--line-height: 1.273;
+	--text-xs: 12px;
+	--text-xs--line-height: 1.333;
+	--text-sm: 14px;
+	--text-sm--line-height: 1.429;
+	--text-base: 16px;
+	--text-base--line-height: 1.5;
+	--text-lg: 18px;
+	--text-lg--line-height: 1.333;
+	--text-xl: 20px;
+	--text-xl--line-height: 1.2;
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: var(--radius);
+	--radius-lg: calc(var(--radius) + 4px);
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-topbar: var(--topbar);
+	--color-topbar-foreground: var(--topbar-foreground);
+	--color-topbar-muted: var(--topbar-muted);
+	--color-topbar-border: var(--topbar-border);
+	--color-topbar-edge: var(--topbar-edge);
+	--color-topbar-mark: var(--topbar-mark);
+	--color-app-ground: var(--app-ground);
+	--color-panel: var(--panel);
+	--color-panel-header: var(--panel-header);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-control: var(--control);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-border: var(--border);
+	--color-ring: var(--ring);
+	--color-row-hover: var(--row-hover);
+	--color-row-accent: var(--row-accent);
+	--color-error-bg: var(--error-bg);
+	--color-error-fg: var(--error-fg);
+	--color-error-border: var(--error-border);
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+
+	html {
+		font-size: 14px;
+	}
+
+	body {
+		@apply bg-app-ground text-foreground;
+		overflow-wrap: break-word;
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+	}
+
+	/* 한국어는 단어 중간이 아니라 띄어쓰기에서 줄을 바꾼다. */
+	:lang(ko) {
+		word-break: keep-all;
+	}
+
+	button:not(:disabled),
+	summary {
+		cursor: pointer;
+	}
+}

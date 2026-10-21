@@ -75,5 +75,5 @@ docker compose up -d --build                   # 이미지 빌드 + caddy(HTTPS 
 3. [x] Go 백엔드: 게시글 / 댓글 API (작성자 정보 없는 스키마, 시각은 시간 단위로 뭉갬)
 4. [x] portal 과 backend 연결 (BFF, 공유 시크릿): 글 목록 / 쓰기 / 상세 / 댓글
 5. [ ] 익명성 강화: 시간 뭉개기, 글별 수정 / 삭제 토큰
-6. [ ] 디자인 (hairline 테마: 1px 선과 면 단계로 깊이 표현)
+6. [x] 디자인 (hairline 테마: 1px 선과 면 단계로 깊이 표현)
 7. [ ] 배포
