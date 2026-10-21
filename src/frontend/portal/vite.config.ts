@@ -6,7 +6,10 @@ import { defineConfig } from 'vite';
 export default defineConfig({
 	// The Google OAuth redirect URI is registered for :5173. Fail loudly when the
 	// port is taken instead of silently moving to :5174 and breaking sign-in.
-	server: { port: 5173, strictPort: true },
+	// host: true listens on every interface (IPv4 + IPv6). Without it vite binds
+	// only to what `localhost` resolves to (here [::1]), so SSH / VS Code port
+	// forwarding to 127.0.0.1:5173 is refused.
+	server: { host: true, port: 5173, strictPort: true },
 	plugins: [
 		tailwindcss(),
 		sveltekit({
