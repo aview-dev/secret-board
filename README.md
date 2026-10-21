@@ -35,7 +35,7 @@ secret-board/
 |- CLAUDE.md             # Claude Code 용 프로젝트 안내
 |- .claude/docs/         # Claude Code 용 세부 규칙
 |- .github/workflows/    # CI (test, build, docker)
-|- docs/                 # 설계 문서 (anonymity, google-oauth)
+|- docs/                 # 설계 문서 (anonymity, google-oauth, local-share)
 |- scripts/              # 개발 스크립트 (dev.sh)
 |- src/backend/          # Go 백엔드
 |  |- cmd/server/        # API 서버
@@ -58,11 +58,12 @@ make test
 ## 배포
 
 ```bash
-make build-docker-images                       # secret-board:<ver>, secret-board:<ver>-portal
 cd docker/deploy/secret-board
 cp .env.example .env                           # 값 채우기
-docker compose up -d
+docker compose up -d --build                   # 이미지 빌드 + caddy(HTTPS) / portal / backend 실행
 ```
+
+회사 도메인 없이 내 PC 에서 띄워 동료와 쓰는 방법은 [docs/local-share.md](docs/local-share.md) 를 봅니다.
 
 `VERSION` 을 올린 커밋에 `vX.Y.Z` 태그를 push 하면 GitHub Actions 가 `ghcr.io/<owner>/secret-board` 로 이미지를 올립니다.
 

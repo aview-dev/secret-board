@@ -1,0 +1,16 @@
+# Caddy in front of the portal. SITE_ADDRESS comes from .env.
+#
+# `tls internal`: Caddy signs the certificate with its own local CA. Browsers
+# warn once ("not private"), which is the price of having no company domain
+# yet. With a real domain that resolves publicly, delete the `tls internal`
+# line and Caddy fetches a Let's Encrypt certificate on its own; with a
+# company certificate, use `tls /path/cert.pem /path/key.pem` instead.
+#
+# No `log` directive on purpose: Caddy writes no access log unless asked,
+# and an access log would undo the anonymity rules (docs/anonymity.md).
+
+{$SITE_ADDRESS} {
+	tls internal
+	encode zstd gzip
+	reverse_proxy portal:3000
+}

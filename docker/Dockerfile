@@ -25,6 +25,8 @@ ARG ARG_SECRET_BOARD_VERSION="unknown"
 RUN CGO_ENABLED=0 go build -v -trimpath \
         -ldflags "-s -w -X main.version=${ARG_SECRET_BOARD_VERSION}" \
         -o /out/secret-board-server ./cmd/server
+# empty data dir for the runtime stage (distroless has no shell to mkdir)
+RUN mkdir -p /out/data
 
 ########################################################################################################################
 # build portal (SvelteKit adapter-node)
@@ -72,6 +74,9 @@ ENV RUNNING_IN_DOCKER=true
 WORKDIR /secret-board
 
 COPY --from=backend-build /out/secret-board-server ./secret-board-server
+# board.db lives here (named volume in the deploy compose). Owned by the
+# distroless nonroot user so a fresh volume inherits a writable directory.
+COPY --from=backend-build --chown=65532:65532 /out/data /var/secret-board/backend
 
 EXPOSE 8080
 

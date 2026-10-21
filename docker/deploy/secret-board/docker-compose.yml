@@ -1,27 +1,56 @@
-# secret-board deployment. Variables come from
-# a .env file next to this compose file - start from .env.example.
+# secret-board deployment. Variables come from a .env file next to this
+# compose file - start from .env.example.
 #
-# First run:
+# First run (builds the images from this checkout, no registry needed):
 #   cp .env.example .env            # then fill in the secrets
-#   docker compose up -d
+#   docker compose up -d --build
 #
-# Only the portal is exposed. Put TLS in front of it (company reverse proxy or
-# a load balancer); the backend stays internal to the compose network.
+# Only caddy is exposed (80 -> 443 redirect, 443 HTTPS). The portal and the
+# backend stay internal to the compose network.
 #
-# Logging: json-file with a small cap. Neither service writes per-request
-# access logs (docs/anonymity.md), so these hold startup / error lines only.
+# Logging: json-file with a small cap. No service writes per-request access
+# logs (docs/anonymity.md), so these hold startup / error lines only.
 
 services:
+  ######################################################################################################################
+  # caddy (TLS terminator / reverse proxy; the ONLY exposed service)
+  caddy:
+    image: caddy:2.10
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Caddy's own CA for `tls internal`. Keep it, or every restart mints a
+      # new CA and users see the certificate warning again.
+      - caddy-data:/data
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 3
+    depends_on:
+      - portal
+
   ######################################################################################################################
   # backend (posts / comments; never receives user identity)
   backend:
     image: ${IMAGE_REPO:-secret-board}:${SECRET_BOARD_VERSION}
+    build:
+      context: ../../..
+      dockerfile: docker/Dockerfile
+      target: secret-board-backend
+      args:
+        ARG_SECRET_BOARD_VERSION: ${SECRET_BOARD_VERSION}
     environment:
       SECRET_BOARD_SERVER_ADDRESS: :8080
       SECRET_BOARD_BACKEND_SECRET: ${SECRET_BOARD_BACKEND_SECRET}
       TZ: ${TIMEZONE:-Asia/Seoul}
     volumes:
-      - ./vol/backend:/var/secret-board/backend
+      - backend-data:/var/secret-board/backend
     restart: unless-stopped
     logging:
       driver: json-file
@@ -30,16 +59,20 @@ services:
         max-file: 3
 
   ######################################################################################################################
-  # portal (SvelteKit BFF + Google sign-in, the ONLY exposed service)
+  # portal (SvelteKit BFF + Google sign-in, served through caddy)
   portal:
     image: ${IMAGE_REPO:-secret-board}:${SECRET_BOARD_VERSION}-portal
-    ports:
-      - "${PORTAL_PORT:-3000}:3000"
+    build:
+      context: ../../..
+      dockerfile: docker/Dockerfile
+      target: secret-board-portal
+      args:
+        ARG_SECRET_BOARD_VERSION: ${SECRET_BOARD_VERSION}
     environment:
       # adapter-node: ORIGIN must match the public URL users open.
       PORT: 3000
-      ORIGIN: ${PORTAL_ORIGIN}
-      BETTER_AUTH_URL: ${PORTAL_ORIGIN}
+      ORIGIN: https://${SITE_ADDRESS}
+      BETTER_AUTH_URL: https://${SITE_ADDRESS}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
@@ -48,7 +81,7 @@ services:
       SECRET_BOARD_BACKEND_SECRET: ${SECRET_BOARD_BACKEND_SECRET}
       TZ: ${TIMEZONE:-Asia/Seoul}
     volumes:
-      - ./vol/portal:/var/secret-board/portal
+      - portal-data:/var/secret-board/portal
     restart: unless-stopped
     logging:
       driver: json-file
@@ -57,3 +90,11 @@ services:
         max-file: 3
     depends_on:
       - backend
+
+# Named volumes, not ./vol bind mounts: the portal and backend run as non-root
+# users, and a named volume inherits the image directory's owner on first use,
+# so the DB files are writable on Linux hosts too.
+volumes:
+  caddy-data:
+  backend-data:
+  portal-data:
