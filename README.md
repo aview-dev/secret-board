@@ -36,6 +36,7 @@ secret-board/
 |- .claude/docs/         # Claude Code 용 세부 규칙
 |- .github/workflows/    # CI (test, build, docker)
 |- docs/                 # 설계 문서 (anonymity, google-oauth)
+|- scripts/              # 개발 스크립트 (dev.sh)
 |- src/backend/          # Go 백엔드
 |  |- cmd/server/        # API 서버
 |  `- internal/httpapi/  # 라우팅, portal 시크릿 검사
@@ -50,8 +51,7 @@ mise install                                   # go / bun / node 버전 맞추�
 make install                                   # portal 의존성
 cp src/frontend/portal/.env.example src/frontend/portal/.env   # 값 채우기 (docs/google-oauth.md)
 
-make backend                                   # :8080
-make dev-portal                                # :5173
+make dev                                       # backend :8080 + portal :5173 (Ctrl-C 로 둘 다 종료)
 make test
 ```
 

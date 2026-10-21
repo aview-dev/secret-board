@@ -30,6 +30,7 @@ GO_LDFLAGS := -s -w -X main.version=$(SECRET_BOARD_VERSION)
 help:
 	@echo "secret-board - available targets:"
 	@echo "  install             - Install portal dependencies (bun install)"
+	@echo "  dev                 - Run backend + portal together (Ctrl-C stops both)"
 	@echo "  backend             - Run the Go backend (:8080)"
 	@echo "  dev-portal          - Run the portal in dev mode (Vite HMR, :5173)"
 	@echo "  tidy                - go mod tidy"
@@ -43,6 +44,10 @@ help:
 	@echo "  format              - prettier --write"
 	@echo "  lint                - prettier --check + eslint"
 	@echo "  build-docker-images - Build backend/portal docker images (UPLOAD=1 pushes them)"
+
+.PHONY: dev
+dev:
+	@bash $(ROOT_DIR)/scripts/dev.sh
 
 .PHONY: backend
 backend:

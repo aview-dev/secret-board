@@ -4,6 +4,9 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+	// The Google OAuth redirect URI is registered for :5173. Fail loudly when the
+	// port is taken instead of silently moving to :5174 and breaking sign-in.
+	server: { port: 5173, strictPort: true },
 	plugins: [
 		tailwindcss(),
 		sveltekit({

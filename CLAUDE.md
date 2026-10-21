@@ -12,7 +12,7 @@ corelinesoft.com Google 계정만 로그인할 수 있는 사내 익명 게시�
 
 ## 명령
 
-- `make backend`, `make dev-portal` - 개발 실행
+- `make dev` - backend + portal 동시 실행 (따로: `make backend`, `make dev-portal`)
 - `make test` - go vet + go test + svelte-check
 - `make lint`, `make format`
 - `make build-docker-images` (UPLOAD=1 이면 push)
