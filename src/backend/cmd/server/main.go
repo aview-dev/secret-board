@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"secret-board/backend/internal/board"
 	"secret-board/backend/internal/httpapi"
 )
 
@@ -28,9 +29,17 @@ func main() {
 		slog.Warn("SECRET_BOARD_BACKEND_SECRET is empty, portal secret check is disabled (dev only)")
 	}
 
+	dbPath := envOr("SECRET_BOARD_DB_PATH", "board.db")
+	store, err := board.Open(dbPath)
+	if err != nil {
+		slog.Error("open board db failed", "path", dbPath, "err", err)
+		os.Exit(1)
+	}
+	defer store.Close()
+
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           httpapi.NewServer(httpapi.Config{PortalSecret: secret, Version: version}),
+		Handler:           httpapi.NewServer(httpapi.Config{PortalSecret: secret, Version: version, Store: store}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

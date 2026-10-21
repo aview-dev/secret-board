@@ -17,6 +17,8 @@ RESET_COLOR := \033[0m
 # Shared secret between portal BFF and backend. Empty = check disabled (dev).
 export SECRET_BOARD_BACKEND_SECRET ?=
 export SECRET_BOARD_SERVER_ADDRESS ?= :8080
+# board.db (posts / comments). Relative to src/backend when run via make.
+export SECRET_BOARD_DB_PATH ?= board.db
 
 # Version single-source-of-truth - see /VERSION. Env var override wins for CI.
 include VERSION

@@ -1,4 +1,11 @@
+import { error } from '@sveltejs/kit';
+import { listPosts } from '$lib/server/backend';
 import type { PageServerLoad } from './$types';
 
-// hooks의 가드 덕분에 여기 오는 사람은 항상 로그인한 회사 계정이다.
-export const load: PageServerLoad = ({ locals }) => ({ email: locals.user!.email });
+export const load: PageServerLoad = async () => {
+	try {
+		return await listPosts();
+	} catch {
+		error(502, '게시판 서버에 연결할 수 없습니다.');
+	}
+};

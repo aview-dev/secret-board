@@ -56,6 +56,7 @@ services:
         ARG_SECRET_BOARD_VERSION: ${SECRET_BOARD_VERSION}
     environment:
       SECRET_BOARD_SERVER_ADDRESS: :8080
+      SECRET_BOARD_DB_PATH: /var/secret-board/backend/board.db
       SECRET_BOARD_BACKEND_SECRET: ${SECRET_BOARD_BACKEND_SECRET}
       TZ: ${TIMEZONE:-Asia/Seoul}
     volumes:

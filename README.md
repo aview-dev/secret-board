@@ -22,7 +22,7 @@ backend :8080 (Go)                             --- board.db (글, 댓글)
 |---|---|
 | backend | Go 1.25.8, stdlib net/http, log/slog |
 | portal | SvelteKit 2 (Svelte 5, adapter-node), bun, tailwind v4, better-auth (Google OAuth) |
-| DB | SQLite (portal: `node:sqlite`, backend: 다음 단계) |
+| DB | SQLite (portal: `node:sqlite`, backend: `modernc.org/sqlite`, 순수 Go) |
 | 배포 | Docker 멀티 스테이지, docker compose, GitHub Actions (태그 push 시 GHCR) |
 
 ## 저장소 구조
@@ -39,6 +39,7 @@ secret-board/
 |- scripts/              # 개발 스크립트 (dev.sh)
 |- src/backend/          # Go 백엔드
 |  |- cmd/server/        # API 서버
+|  |- internal/board/    # 게시글 / 댓글 저장소 (board.db)
 |  `- internal/httpapi/  # 라우팅, portal 시크릿 검사
 |- src/frontend/portal/  # SvelteKit 포탈
 `- docker/               # Dockerfile, 이미지 빌드 스크립트, 배포 compose
@@ -71,8 +72,8 @@ docker compose up -d --build                   # 이미지 빌드 + caddy(HTTPS 
 
 1. [x] 뼈대: SvelteKit 포탈, Go 백엔드, Docker, CI
 2. [x] Google OAuth 로그인 + corelinesoft.com 도메인 제한 (실제 OAuth 키로 확인 필요)
-3. [ ] Go 백엔드: 게시글 API (작성자 정보 없는 스키마)
-4. [ ] portal 과 backend 연결 (BFF, 공유 시크릿)
+3. [x] Go 백엔드: 게시글 / 댓글 API (작성자 정보 없는 스키마, 시각은 시간 단위로 뭉갬)
+4. [x] portal 과 backend 연결 (BFF, 공유 시크릿): 글 목록 / 쓰기 / 상세 / 댓글
 5. [ ] 익명성 강화: 시간 뭉개기, 글별 수정 / 삭제 토큰
 6. [ ] 디자인 (hairline 테마: 1px 선과 면 단계로 깊이 표현)
 7. [ ] 배포
