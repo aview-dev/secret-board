@@ -1,16 +1,31 @@
-# Caddy in front of the portal. SITE_ADDRESS comes from .env.
+# Caddy in front of the portal. SITE_ADDRESS / HTTP_PORT / HTTPS_PORT come
+# from .env.
+#
+# Caddy listens on the same port numbers inside the container as the host
+# publishes (compose maps HTTPS_PORT:HTTPS_PORT). The http -> https redirect
+# is written out below because Caddy's automatic one drops a non-default
+# HTTPS port and would send users to :443.
 #
 # `tls internal`: Caddy signs the certificate with its own local CA. Browsers
 # warn once ("not private"), which is the price of having no company domain
-# yet. With a real domain that resolves publicly, delete the `tls internal`
-# line and Caddy fetches a Let's Encrypt certificate on its own; with a
-# company certificate, use `tls /path/cert.pem /path/key.pem` instead.
+# yet. With a company certificate, use `tls /path/cert.pem /path/key.pem`
+# instead.
 #
 # No `log` directive on purpose: Caddy writes no access log unless asked,
 # and an access log would undo the anonymity rules (docs/anonymity.md).
 
-{$SITE_ADDRESS} {
+{
+	http_port {$HTTP_PORT}
+	https_port {$HTTPS_PORT}
+	auto_https disable_redirects
+}
+
+https://{$SITE_ADDRESS}:{$HTTPS_PORT} {
 	tls internal
 	encode zstd gzip
 	reverse_proxy portal:3000
+}
+
+http://{$SITE_ADDRESS}:{$HTTP_PORT} {
+	redir https://{$SITE_ADDRESS}:{$HTTPS_PORT}{uri} permanent
 }

@@ -5,8 +5,13 @@
 #   cp .env.example .env            # then fill in the secrets
 #   docker compose up -d --build
 #
-# Only caddy is exposed (80 -> 443 redirect, 443 HTTPS). The portal and the
-# backend stay internal to the compose network.
+# Only caddy is exposed: HTTP_PORT (default 8088, redirects to HTTPS) and
+# HTTPS_PORT (default 8443). 80 / 443 are left alone so other projects on the
+# same machine can keep them. The portal and the backend stay internal to the
+# compose network.
+#
+# Users open https://${SITE_ADDRESS}:${HTTPS_PORT}. Change either value and the
+# Google OAuth client's origin / redirect URI must change with it.
 #
 # Logging: json-file with a small cap. No service writes per-request access
 # logs (docs/anonymity.md), so these hold startup / error lines only.
@@ -16,11 +21,15 @@ services:
   # caddy (TLS terminator / reverse proxy; the ONLY exposed service)
   caddy:
     image: caddy:2.10
+    # Same number on both sides: Caddy has to know the public HTTPS port to
+    # build its http -> https redirect (see Caddyfile).
     ports:
-      - "${HTTP_PORT:-80}:80"
-      - "${HTTPS_PORT:-443}:443"
+      - "${HTTP_PORT:-8088}:${HTTP_PORT:-8088}"
+      - "${HTTPS_PORT:-8443}:${HTTPS_PORT:-8443}"
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS}
+      HTTP_PORT: ${HTTP_PORT:-8088}
+      HTTPS_PORT: ${HTTPS_PORT:-8443}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       # Caddy's own CA for `tls internal`. Keep it, or every restart mints a
@@ -69,10 +78,10 @@ services:
       args:
         ARG_SECRET_BOARD_VERSION: ${SECRET_BOARD_VERSION}
     environment:
-      # adapter-node: ORIGIN must match the public URL users open.
+      # adapter-node: ORIGIN must match the public URL users open, port included.
       PORT: 3000
-      ORIGIN: https://${SITE_ADDRESS}
-      BETTER_AUTH_URL: https://${SITE_ADDRESS}
+      ORIGIN: https://${SITE_ADDRESS}:${HTTPS_PORT:-8443}
+      BETTER_AUTH_URL: https://${SITE_ADDRESS}:${HTTPS_PORT:-8443}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}

@@ -3,8 +3,10 @@
 회사 도메인이 아직 없을 때, 개인 PC (예: `10.77.4.34`) 에서 docker compose 로 띄우고 사내 동료가 접속하게 하는 방법입니다.
 
 ```
-동료 브라우저 -> https://10-77-4-34.sslip.io -> 내 PC :443
-                                                 `- caddy (HTTPS, tls internal) -> portal :3000 -> backend :8080
+동료 브라우저 -> https://10-77-4-34.sslip.io:8443 -> 내 PC :8443
+                                                      `- caddy (HTTPS, tls internal) -> portal :3000 -> backend :8080
+
+http://10-77-4-34.sslip.io:8088 -> caddy -> https://10-77-4-34.sslip.io:8443 로 리다이렉트
 ```
 
 - `sslip.io` 는 `<IP 를 - 로 이은 것>.sslip.io` 를 그 IP 로 해석해 주는 공개 DNS 입니다. Google 은 IP 주소를 리디렉션 URI 로 받지 않지만, 이 이름은 공개 도메인이라 등록할 수 있습니다.
@@ -13,14 +15,17 @@
 ## 준비물
 
 - Docker (Docker Desktop 또는 Docker Engine + compose 플러그인)
-- PC 의 80, 443 포트가 비어 있고, 방화벽에서 사내 접속을 허용
+- PC 의 8088, 8443 포트가 비어 있고, 방화벽에서 사내 접속을 허용
+  - 80 / 443 은 다른 프로젝트가 쓰는 경우가 많아 쓰지 않습니다. 바꾸려면 `.env` 의 `HTTP_PORT` / `HTTPS_PORT` 를 고치고, 아래 Google 주소의 포트도 같이 바꿉니다.
 
 ## 1. Google OAuth 클라이언트에 주소 추가
 
 기존 클라이언트에 추가하거나 `secret-board share` 클라이언트를 새로 만듭니다 ([google-oauth.md](google-oauth.md)).
 
-- 승인된 JavaScript 원본: `https://10-77-4-34.sslip.io`
-- 승인된 리디렉션 URI: `https://10-77-4-34.sslip.io/api/auth/callback/google`
+포트까지 정확히 적어야 합니다.
+
+- 승인된 JavaScript 원본: `https://10-77-4-34.sslip.io:8443`
+- 승인된 리디렉션 URI: `https://10-77-4-34.sslip.io:8443/api/auth/callback/google`
 
 ## 2. 설정과 실행
 
@@ -37,8 +42,9 @@ docker compose up -d --build
 
 ## 3. 확인
 
-- 내 PC: `https://10-77-4-34.sslip.io` 접속 > 경고 통과 > Google 로그인
-- 동료 PC: 같은 주소. 접속이 안 되면 PC 방화벽의 443 인바운드 허용을 확인
+- `docker port secret-board-caddy-1` 에 `8088/tcp` 와 `8443/tcp` 가 보여야 합니다. 비어 있으면 `docker compose logs caddy` 와 `docker compose up -d caddy` 의 에러 (`port is already allocated` 등) 를 확인합니다.
+- 내 PC: `https://10-77-4-34.sslip.io:8443` 접속 > 경고 통과 > Google 로그인
+- 동료 PC: 같은 주소. 접속이 안 되면 PC 방화벽의 8443 인바운드 허용을 확인
 
 ## 운영
 

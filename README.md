@@ -60,7 +60,7 @@ make test
 ```bash
 cd docker/deploy/secret-board
 cp .env.example .env                           # 값 채우기
-docker compose up -d --build                   # 이미지 빌드 + caddy(HTTPS) / portal / backend 실행
+docker compose up -d --build                   # 이미지 빌드 + caddy(HTTPS :8443) / portal / backend 실행
 ```
 
 회사 도메인 없이 내 PC 에서 띄워 동료와 쓰는 방법은 [docs/local-share.md](docs/local-share.md) 를 봅니다.
