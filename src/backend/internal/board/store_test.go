@@ -68,6 +68,35 @@ func TestPostAndComments(t *testing.T) {
 	}
 }
 
+func TestDeletePostCascades(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+
+	p, _ := s.CreatePost(ctx, "지울 글", "a")
+	keep, _ := s.CreatePost(ctx, "남을 글", "b")
+	s.CreateComment(ctx, p.ID, "댓글")
+	s.Vote(ctx, p.ID, strings.Repeat("a", 64), 1)
+
+	if err := s.DeletePost(ctx, p.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.GetPost(ctx, p.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("deleted post still found: %v", err)
+	}
+	// 댓글과 표가 남아 있으면 foreign_keys 가 꺼져 있다는 뜻이다.
+	var n int
+	s.db.QueryRow(`SELECT (SELECT COUNT(*) FROM comments) + (SELECT COUNT(*) FROM votes)`).Scan(&n)
+	if n != 0 {
+		t.Fatalf("comments / votes not cascaded: %d rows left", n)
+	}
+	if _, err := s.GetPost(ctx, keep.ID); err != nil {
+		t.Fatalf("other post affected: %v", err)
+	}
+	if err := s.DeletePost(ctx, p.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("delete twice: got %v, want ErrNotFound", err)
+	}
+}
+
 func TestValidation(t *testing.T) {
 	s := openTest(t)
 	ctx := context.Background()

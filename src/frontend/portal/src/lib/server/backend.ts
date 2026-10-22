@@ -20,7 +20,7 @@ export class BackendError extends Error {
 }
 
 async function call<T>(
-	method: 'GET' | 'POST' | 'PUT',
+	method: 'GET' | 'POST' | 'PUT' | 'DELETE',
 	path: string,
 	body?: unknown,
 	extraHeaders?: Record<string, string>
@@ -53,6 +53,10 @@ export const getPost = (id: number, voter: string) =>
 
 export const createPost = (title: string, body: string) =>
 	call<Post>('POST', '/api/v1/posts', { title, body });
+
+// 관리자 삭제. 관리자 확인은 부르는 쪽(action)이 하고, 누가 지우는지는 보내지 않는다 (규칙 7).
+// 성공하면 204 라 본문이 없다. call 의 res.json() 실패는 {} 로 넘어간다.
+export const deletePost = (id: number) => call<unknown>('DELETE', `/api/v1/posts/${id}`);
 
 export const createComment = (postId: number, body: string) =>
 	call<Comment>('POST', `/api/v1/posts/${postId}/comments`, { body });

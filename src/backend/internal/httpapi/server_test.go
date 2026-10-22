@@ -75,6 +75,27 @@ func TestCreatePostAndComment(t *testing.T) {
 	}
 }
 
+func TestDeletePost(t *testing.T) {
+	h := newTestServer(t, "")
+
+	do := func(method, path, body string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(method, path, strings.NewReader(body)))
+		return rec
+	}
+
+	do("POST", "/api/v1/posts", `{"title":"t","body":"b"}`)
+	if rec := do("DELETE", "/api/v1/posts/1", ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("delete: got %d %s", rec.Code, rec.Body)
+	}
+	if rec := do("GET", "/api/v1/posts/1", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("get after delete: got %d", rec.Code)
+	}
+	if rec := do("DELETE", "/api/v1/posts/1", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("delete twice: got %d", rec.Code)
+	}
+}
+
 func TestVote(t *testing.T) {
 	h := newTestServer(t, "")
 	voter := strings.Repeat("c", 64)

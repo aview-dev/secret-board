@@ -1,5 +1,5 @@
-import { error, fail } from '@sveltejs/kit';
-import { BackendError, createComment, getPost, vote } from '$lib/server/backend';
+import { error, fail, redirect } from '@sveltejs/kit';
+import { BackendError, createComment, deletePost, getPost, vote } from '$lib/server/backend';
 import { voterHash } from '$lib/server/votes';
 import { MAX_COMMENT_LEN } from '$lib/board';
 import type { Actions, PageServerLoad } from './$types';
@@ -54,5 +54,19 @@ export const actions: Actions = {
 			return fail(502, { voteMessage: '투표를 저장할 수 없습니다.' });
 		}
 		return { ok: true };
+	},
+
+	// 관리자만. 버튼을 숨기는 것만으로는 막을 수 없어서 (form 은 누구나 보낼 수 있다) 여기서 다시 확인한다.
+	delete: async ({ params, locals }) => {
+		const id = parseId(params.id);
+		if (locals.role !== 'admin') error(403, '관리자만 삭제할 수 있습니다.');
+
+		try {
+			await deletePost(id);
+		} catch (e) {
+			if (e instanceof BackendError && e.status === 404) error(404, '글을 찾을 수 없습니다.');
+			return fail(502, { deleteMessage: '글을 삭제할 수 없습니다.' });
+		}
+		redirect(303, '/');
 	}
 };

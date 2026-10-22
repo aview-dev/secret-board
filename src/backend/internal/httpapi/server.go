@@ -36,6 +36,7 @@ func NewServer(cfg Config) http.Handler {
 	api.HandleFunc("GET /api/v1/posts", h.listPosts)
 	api.HandleFunc("POST /api/v1/posts", h.createPost)
 	api.HandleFunc("GET /api/v1/posts/{id}", h.getPost)
+	api.HandleFunc("DELETE /api/v1/posts/{id}", h.deletePost)
 	api.HandleFunc("POST /api/v1/posts/{id}/comments", h.createComment)
 	api.HandleFunc("PUT /api/v1/posts/{id}/vote", h.vote)
 	mux.Handle("/api/", requirePortalSecret(cfg.PortalSecret, api))
@@ -95,6 +96,19 @@ func (h *handlers) getPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"post": p, "comments": comments, "myVote": myVote})
+}
+
+// deletePost 는 관리자 삭제용이다. 관리자인지는 portal 이 확인하고, 여기에는 누가 지우는지 오지 않는다 (규칙 7).
+func (h *handlers) deletePost(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.store.DeletePost(r.Context(), id); err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *handlers) createComment(w http.ResponseWriter, r *http.Request) {

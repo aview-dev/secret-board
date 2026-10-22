@@ -4,14 +4,16 @@
 	import MessageSquare from '@lucide/svelte/icons/message-square';
 	import ThumbsDown from '@lucide/svelte/icons/thumbs-down';
 	import ThumbsUp from '@lucide/svelte/icons/thumbs-up';
+	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 	import PanelHeader from '$lib/components/PanelHeader.svelte';
 	import { MAX_COMMENT_LEN, formatHour } from '$lib/board';
-	import { BUTTON_PRIMARY, INPUT, PANEL } from '$lib/ui';
+	import { BUTTON_GHOST, BUTTON_PRIMARY, INPUT, PANEL } from '$lib/ui';
 
 	let { data, form } = $props();
 	let submitting = $state(false);
 	let voting = $state(false);
+	let deleting = $state(false);
 
 	// 고른 표는 색으로 구분한다. 좋아요는 강조색, 싫어요는 붉은 계열.
 	const VOTE_BUTTON =
@@ -74,6 +76,34 @@
 				<span class="text-xs text-muted-foreground">누가 눌렀는지는 저장되지 않습니다.</span>
 			{/if}
 		</form>
+		<!-- 관리자에게만 보인다. 버튼을 숨기는 건 화면 편의이고, 실제 권한 확인은 delete action 이 한다. -->
+		{#if data.me?.role === 'admin'}
+			<form
+				method="POST"
+				action="?/delete"
+				use:enhance={({ cancel }) => {
+					if (
+						!confirm(
+							'이 글을 삭제할까요? 댓글과 좋아요 / 싫어요도 함께 지워지고 되돌릴 수 없습니다.'
+						)
+					)
+						return cancel();
+					deleting = true;
+					return async ({ update }) => {
+						await update();
+						deleting = false;
+					};
+				}}
+				class="flex items-center justify-end gap-2 border-t px-6 py-2"
+			>
+				{#if form?.deleteMessage}
+					<span class="text-xs text-error-fg">{form.deleteMessage}</span>
+				{/if}
+				<button disabled={deleting} class="{BUTTON_GHOST} hover:text-error-fg">
+					<Trash2 />관리자 삭제
+				</button>
+			</form>
+		{/if}
 	</article>
 
 	<section class={PANEL}>

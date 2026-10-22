@@ -184,6 +184,19 @@ func (s *Store) GetPost(ctx context.Context, id int64) (Post, error) {
 	return p, nil
 }
 
+// DeletePost 는 글을 지운다. 댓글과 표는 ON DELETE CASCADE 로 함께 지워진다.
+// 누가 지웠는지는 받지도 남기지도 않는다 (관리자 확인은 portal 이 한다).
+func (s *Store) DeletePost(ctx context.Context, id int64) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM posts WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // ListComments 는 오래된 댓글부터 돌려준다.
 func (s *Store) ListComments(ctx context.Context, postID int64) ([]Comment, error) {
 	rows, err := s.db.QueryContext(ctx,
