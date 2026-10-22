@@ -93,7 +93,9 @@ const voteCounts = `
 // Open 은 path 의 SQLite 파일을 열고 (없으면 만들고) 스키마를 맞춘다.
 func Open(path string) (*Store, error) {
 	// foreign_keys 는 연결마다 켜야 해서 DSN 에 둔다. busy_timeout 은 쓰기가 겹칠 때 바로 실패하지 않게 한다.
-	dsn := "file:" + path + "?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"
+	// secure_delete: 지운 행이 있던 자리를 0 으로 덮어쓴다. 끄면 지운 글이 파일의 빈 페이지에 한동안 남아
+	// board.db 를 열어 보면 되살릴 수 있다 (관리자 삭제의 의미가 없어진다).
+	dsn := "file:" + path + "?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=secure_delete(1)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err

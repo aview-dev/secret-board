@@ -97,6 +97,18 @@ func TestDeletePostCascades(t *testing.T) {
 	}
 }
 
+// 지운 글이 파일에 남지 않으려면 secure_delete 가 켜져 있어야 한다 (DSN).
+func TestSecureDeleteIsOn(t *testing.T) {
+	s := openTest(t)
+	var on int
+	if err := s.db.QueryRow(`PRAGMA secure_delete`).Scan(&on); err != nil {
+		t.Fatal(err)
+	}
+	if on != 1 {
+		t.Fatalf("secure_delete: got %d, want 1", on)
+	}
+}
+
 func TestValidation(t *testing.T) {
 	s := openTest(t)
 	ctx := context.Background()
