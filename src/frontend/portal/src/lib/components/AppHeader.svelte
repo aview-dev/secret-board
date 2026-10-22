@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import Flag from '@lucide/svelte/icons/flag';
 	import LogOut from '@lucide/svelte/icons/log-out';
 	import User from '@lucide/svelte/icons/user';
 	import Users from '@lucide/svelte/icons/users';
@@ -32,6 +33,9 @@
 				>
 					관리자
 				</span>
+				<a href={resolve('/admin/reports')} class={link} aria-label="신고 목록">
+					<Flag /><span class="hidden sm:inline">신고</span>
+				</a>
 				<a href={resolve('/admin/users')} class={link} aria-label="사용자 관리">
 					<Users /><span class="hidden sm:inline">사용자 관리</span>
 				</a>

@@ -5,11 +5,12 @@ import {
 	deleteComment,
 	deletePost,
 	getPost,
+	reportPost,
 	vote
 } from '$lib/server/backend';
 import { renderMarkdown } from '$lib/server/markdown';
-import { voterHash } from '$lib/server/votes';
-import { MAX_COMMENT_LEN } from '$lib/board';
+import { reporterHash, voterHash } from '$lib/server/votes';
+import { MAX_COMMENT_LEN, isReportReason } from '$lib/board';
 import type { Actions, PageServerLoad } from './$types';
 
 function parseId(raw: string): number {
@@ -69,6 +70,22 @@ export const actions: Actions = {
 			return fail(502, { voteMessage: '투표를 저장할 수 없습니다.' });
 		}
 		return { ok: true };
+	},
+
+	// 신고. userId 는 reporter 해시를 만들 때만 쓰고 backend 로 보내지 않는다 (규칙 11).
+	// 같은 사람이 다시 신고하면 사유만 바뀌고 개수는 늘지 않는다.
+	report: async ({ params, request, locals }) => {
+		const id = parseId(params.id);
+		const reason = (await request.formData()).get('reason');
+		if (!isReportReason(reason)) return fail(400, { reportMessage: '신고 사유를 골라 주세요.' });
+
+		try {
+			await reportPost(id, reporterHash(locals.user!.id, id), reason);
+		} catch (e) {
+			if (e instanceof BackendError && e.status === 404) error(404, '글을 찾을 수 없습니다.');
+			return fail(502, { reportMessage: '신고를 저장할 수 없습니다.' });
+		}
+		return { reported: true };
 	},
 
 	// 관리자만. 버튼을 숨기는 것만으로는 막을 수 없어서 (form 은 누구나 보낼 수 있다) 여기서 다시 확인한다.

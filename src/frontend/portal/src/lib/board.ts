@@ -23,6 +23,30 @@ export type Comment = {
 	createdAt: string;
 };
 
+// 신고 사유. backend 의 ReportReasons / schema CHECK 와 맞춘다. 자유 입력은 받지 않는다 (규칙 11).
+export const REPORT_REASONS = ['spam', 'abuse', 'privacy', 'other'] as const;
+export type ReportReason = (typeof REPORT_REASONS)[number];
+
+export const REPORT_REASON_LABEL: Record<ReportReason, string> = {
+	spam: '스팸 / 광고',
+	abuse: '욕설 / 비방',
+	privacy: '개인정보 노출',
+	other: '기타'
+};
+
+export function isReportReason(v: unknown): v is ReportReason {
+	return typeof v === 'string' && (REPORT_REASONS as readonly string[]).includes(v);
+}
+
+// 관리자 신고 목록의 한 줄. 누가 신고했는지는 없고 개수만 있다.
+export type ReportedPost = {
+	id: number;
+	title: string;
+	createdAt: string;
+	reports: number;
+	reasons: Partial<Record<ReportReason, number>>;
+};
+
 // 시각은 시간 단위까지만 저장되므로 분은 보여주지 않는다.
 const fmt = new Intl.DateTimeFormat('ko-KR', {
 	month: 'long',

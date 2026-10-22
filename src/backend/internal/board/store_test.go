@@ -222,3 +222,71 @@ func TestVoteRejectsBadInput(t *testing.T) {
 		t.Fatalf("missing post: got %v", err)
 	}
 }
+
+func TestReport(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	p1, _ := s.CreatePost(ctx, "신고 많은 글", "a")
+	p2, _ := s.CreatePost(ctx, "신고 적은 글", "b")
+	s.CreatePost(ctx, "신고 없는 글", "c")
+	alice := strings.Repeat("a", 64)
+	bob := strings.Repeat("b", 64)
+
+	for _, r := range []struct {
+		post     int64
+		reporter string
+		reason   string
+	}{
+		{p1.ID, alice, "spam"},
+		{p1.ID, bob, "abuse"},
+		{p2.ID, alice, "other"},
+		// 같은 사람이 다시 신고하면 사유만 바뀐다.
+		{p2.ID, alice, "privacy"},
+	} {
+		if err := s.Report(ctx, r.post, r.reporter, r.reason); err != nil {
+			t.Fatalf("report %+v: %v", r, err)
+		}
+	}
+
+	got, err := s.ListReported(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].ID != p1.ID || got[0].Reports != 2 || got[1].ID != p2.ID || got[1].Reports != 1 {
+		t.Fatalf("unexpected list: %+v", got)
+	}
+	if got[0].Reasons["spam"] != 1 || got[0].Reasons["abuse"] != 1 || got[1].Reasons["privacy"] != 1 || got[1].Reasons["other"] != 0 {
+		t.Fatalf("unexpected reasons: %+v", got)
+	}
+
+	if err := s.ClearReports(ctx, p1.ID); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = s.ListReported(ctx)
+	if len(got) != 1 || got[0].ID != p2.ID {
+		t.Fatalf("after clear: %+v", got)
+	}
+
+	// 글을 지우면 신고도 같이 지워진다.
+	s.DeletePost(ctx, p2.ID)
+	if got, _ = s.ListReported(ctx); len(got) != 0 {
+		t.Fatalf("after delete: %+v", got)
+	}
+}
+
+func TestReportRejectsBadInput(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	p, _ := s.CreatePost(ctx, "글", "본문")
+	reporter := strings.Repeat("a", 64)
+
+	if err := s.Report(ctx, p.ID, "me@corelinesoft.com", "spam"); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("raw email as reporter: got %v", err)
+	}
+	if err := s.Report(ctx, p.ID, reporter, "누가 썼는지 압니다"); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("free-text reason: got %v", err)
+	}
+	if err := s.Report(ctx, 999, reporter, "spam"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing post: got %v", err)
+	}
+}

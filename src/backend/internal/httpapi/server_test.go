@@ -154,3 +154,41 @@ func TestVote(t *testing.T) {
 		t.Fatalf("get post without voter: %s", rec.Body)
 	}
 }
+
+func TestReport(t *testing.T) {
+	h := newTestServer(t, "")
+	reporter := strings.Repeat("d", 64)
+
+	do := func(method, path, body string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(method, path, strings.NewReader(body)))
+		return rec
+	}
+
+	do("POST", "/api/v1/posts", `{"title":"t","body":"b"}`)
+	if rec := do("PUT", "/api/v1/posts/1/report", `{"reporter":"`+reporter+`","reason":"spam"}`); rec.Code != http.StatusNoContent {
+		t.Fatalf("report: got %d %s", rec.Code, rec.Body)
+	}
+	if rec := do("PUT", "/api/v1/posts/1/report", `{"reporter":"`+reporter+`","reason":"아무 말"}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("bad reason: got %d", rec.Code)
+	}
+	if rec := do("PUT", "/api/v1/posts/42/report", `{"reporter":"`+reporter+`","reason":"spam"}`); rec.Code != http.StatusNotFound {
+		t.Fatalf("report missing post: got %d", rec.Code)
+	}
+
+	rec := do("GET", "/api/v1/reports", "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"reports":1`) || !strings.Contains(rec.Body.String(), `"spam":1`) {
+		t.Fatalf("list reports: got %d %s", rec.Code, rec.Body)
+	}
+	// 목록에 reporter 해시가 나가면 안 된다.
+	if strings.Contains(rec.Body.String(), reporter) {
+		t.Fatalf("reporter leaked in list: %s", rec.Body)
+	}
+
+	if rec := do("DELETE", "/api/v1/posts/1/reports", ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("clear reports: got %d", rec.Code)
+	}
+	if rec := do("GET", "/api/v1/reports", ""); !strings.Contains(rec.Body.String(), `"posts":[]`) {
+		t.Fatalf("after clear: %s", rec.Body)
+	}
+}

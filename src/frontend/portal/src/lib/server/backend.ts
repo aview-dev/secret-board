@@ -3,10 +3,10 @@
 // 익명성 (docs/anonymity.md 규칙 2): 사용자 정보는 헤더에도 본문에도 넣지 않는다.
 // 그래서 SvelteKit 의 event.fetch (쿠키를 따라 보낼 수 있다) 대신 전역 fetch 를 쓰고,
 // 이 모듈의 함수는 locals 나 event 를 인자로 받지 않는다.
-// 예외는 투표용 voter 해시 하나뿐이다 (규칙 9, lib/server/votes.ts). userId 자체는 받지 않는다.
+// 예외는 투표용 voter 해시와 신고용 reporter 해시뿐이다 (규칙 9, 11, lib/server/votes.ts). userId 자체는 받지 않는다.
 
 import { env } from '$env/dynamic/private';
-import type { Comment, Post, Votes } from '$lib/board';
+import type { Comment, Post, ReportReason, ReportedPost, Votes } from '$lib/board';
 
 const BASE_URL = env.SECRET_BOARD_BACKEND_URL || 'http://localhost:8080';
 
@@ -67,3 +67,13 @@ export const deleteComment = (postId: number, commentId: number) =>
 
 export const vote = (postId: number, voter: string, value: number) =>
 	call<Votes>('PUT', `/api/v1/posts/${postId}/vote`, { voter, value });
+
+// 신고. reporter 는 lib/server/votes.ts 의 reporterHash 만 넘긴다 (규칙 11).
+export const reportPost = (postId: number, reporter: string, reason: ReportReason) =>
+	call<unknown>('PUT', `/api/v1/posts/${postId}/report`, { reporter, reason });
+
+// 관리자 신고 목록 / 신고 초기화. 관리자 확인은 부르는 쪽이 한다 (규칙 7).
+export const listReported = () => call<{ posts: ReportedPost[] }>('GET', '/api/v1/reports');
+
+export const clearReports = (postId: number) =>
+	call<unknown>('DELETE', `/api/v1/posts/${postId}/reports`);

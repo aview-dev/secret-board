@@ -40,6 +40,9 @@ func NewServer(cfg Config) http.Handler {
 	api.HandleFunc("POST /api/v1/posts/{id}/comments", h.createComment)
 	api.HandleFunc("DELETE /api/v1/posts/{id}/comments/{commentId}", h.deleteComment)
 	api.HandleFunc("PUT /api/v1/posts/{id}/vote", h.vote)
+	api.HandleFunc("PUT /api/v1/posts/{id}/report", h.report)
+	api.HandleFunc("DELETE /api/v1/posts/{id}/reports", h.clearReports)
+	api.HandleFunc("GET /api/v1/reports", h.listReported)
 	mux.Handle("/api/", requirePortalSecret(cfg.PortalSecret, api))
 
 	return mux
@@ -167,6 +170,48 @@ func (h *handlers) vote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, v)
+}
+
+// report 는 신고를 받는다. reporter 는 portal 이 만든 해시만 오고, reason 은 정해진 값 중 하나다 (규칙 11).
+func (h *handlers) report(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Reporter string `json:"reporter"`
+		Reason   string `json:"reason"`
+	}
+	if !readJSON(w, r, &in) {
+		return
+	}
+	if err := h.store.Report(r.Context(), id, in.Reporter, in.Reason); err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// listReported 와 clearReports 는 관리자 신고 목록용이다. 관리자인지는 portal 이 확인한다.
+func (h *handlers) listReported(w http.ResponseWriter, r *http.Request) {
+	posts, err := h.store.ListReported(r.Context())
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"posts": posts})
+}
+
+func (h *handlers) clearReports(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.store.ClearReports(r.Context(), id); err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {

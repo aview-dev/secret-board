@@ -48,6 +48,18 @@ type Votes struct {
 	Mine     int `json:"mine"`
 }
 
+// 신고 사유. 자유 입력은 받지 않는다 (사유 글에 신원이 드러날 수 있어서). schema 의 CHECK 와 맞춘다.
+var ReportReasons = []string{"spam", "abuse", "privacy", "other"}
+
+// ReportedPost 는 관리자 신고 목록의 한 줄이다. 누가 신고했는지는 없고 개수만 있다.
+type ReportedPost struct {
+	ID        int64          `json:"id"`
+	Title     string         `json:"title"`
+	CreatedAt time.Time      `json:"createdAt"`
+	Reports   int            `json:"reports"`
+	Reasons   map[string]int `json:"reasons"`
+}
+
 type Comment struct {
 	ID        int64     `json:"id"`
 	PostID    int64     `json:"postId"`
@@ -82,6 +94,14 @@ CREATE TABLE IF NOT EXISTS votes (
 	voter   TEXT    NOT NULL,
 	value   INTEGER NOT NULL CHECK (value IN (1, -1)),
 	PRIMARY KEY (post_id, voter)
+) WITHOUT ROWID;
+-- reporter 는 HMAC(신고 키, userId:postId) 의 hex. 투표와 키가 달라 voter 와 맞춰 볼 수 없다 (규칙 11).
+-- 신고 시각은 두지 않고, WITHOUT ROWID 라 신고 순서도 남지 않는다.
+CREATE TABLE IF NOT EXISTS reports (
+	post_id  INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+	reporter TEXT    NOT NULL,
+	reason   TEXT    NOT NULL CHECK (reason IN ('spam', 'abuse', 'privacy', 'other')),
+	PRIMARY KEY (post_id, reporter)
 ) WITHOUT ROWID;
 `
 
@@ -256,9 +276,9 @@ func (s *Store) CreateComment(ctx context.Context, postID int64, body string) (C
 	return Comment{ID: id, PostID: postID, Body: body, CreatedAt: time.Unix(at, 0).UTC()}, nil
 }
 
-// validVoter 는 voter 가 SHA-256 hex (소문자 64 글자) 인지 본다.
+// validHash 는 voter / reporter 가 SHA-256 hex (소문자 64 글자) 인지 본다.
 // portal 이 실수로 이메일 같은 원래 값을 보내도 저장되지 않게 하는 마지막 방어선이다.
-func validVoter(v string) bool {
+func validHash(v string) bool {
 	if len(v) != 64 {
 		return false
 	}
@@ -272,7 +292,7 @@ func validVoter(v string) bool {
 
 // MyVote 는 voter 가 글에 준 표를 돌려준다. 안 눌렀거나 voter 가 비어 있으면 0.
 func (s *Store) MyVote(ctx context.Context, postID int64, voter string) (int, error) {
-	if !validVoter(voter) {
+	if !validHash(voter) {
 		return 0, nil
 	}
 	var v int
@@ -287,7 +307,7 @@ func (s *Store) MyVote(ctx context.Context, postID int64, voter string) (int, er
 // Vote 는 voter 의 표를 value 로 바꾼다. 1 = 좋아요, -1 = 싫어요, 0 = 취소.
 // 같은 voter 는 글마다 한 표뿐이라, 좋아요를 누른 채 싫어요를 누르면 싫어요로 바뀐다.
 func (s *Store) Vote(ctx context.Context, postID int64, voter string, value int) (Votes, error) {
-	if !validVoter(voter) || value < -1 || value > 1 {
+	if !validHash(voter) || value < -1 || value > 1 {
 		return Votes{}, ErrInvalid
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -321,4 +341,74 @@ func (s *Store) Vote(ctx context.Context, postID int64, voter string, value int)
 		return Votes{}, err
 	}
 	return out, tx.Commit()
+}
+
+func validReason(r string) bool {
+	for _, v := range ReportReasons {
+		if r == v {
+			return true
+		}
+	}
+	return false
+}
+
+// Report 는 reporter 의 신고를 남긴다. 같은 reporter 가 다시 신고하면 사유만 바뀌고 개수는 그대로다.
+func (s *Store) Report(ctx context.Context, postID int64, reporter, reason string) error {
+	if !validHash(reporter) || !validReason(reason) {
+		return ErrInvalid
+	}
+	// 글이 없으면 SELECT 가 비어서 아무것도 들어가지 않는다 (CreateComment 와 같은 방식).
+	res, err := s.db.ExecContext(ctx, `
+		INSERT INTO reports (post_id, reporter, reason)
+		SELECT id, ?, ? FROM posts WHERE id = ?
+		ON CONFLICT (post_id, reporter) DO UPDATE SET reason = excluded.reason`, reporter, reason, postID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ListReported 는 신고가 하나라도 있는 글을 신고가 많은 순으로 돌려준다.
+func (s *Store) ListReported(ctx context.Context) ([]ReportedPost, error) {
+	// 사유별로 한 줄씩 나온다. total 과 id 로 정렬하므로 같은 글의 줄은 붙어서 나온다.
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT p.id, p.title, p.created_at, r.reason, COUNT(*),
+			(SELECT COUNT(*) FROM reports t WHERE t.post_id = p.id) AS total
+		FROM reports r JOIN posts p ON p.id = r.post_id
+		GROUP BY p.id, r.reason
+		ORDER BY total DESC, p.id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []ReportedPost{}
+	for rows.Next() {
+		var (
+			id           int64
+			title        string
+			at           int64
+			reason       string
+			count, total int
+		)
+		if err := rows.Scan(&id, &title, &at, &reason, &count, &total); err != nil {
+			return nil, err
+		}
+		if len(out) == 0 || out[len(out)-1].ID != id {
+			out = append(out, ReportedPost{
+				ID: id, Title: title, CreatedAt: time.Unix(at, 0).UTC(), Reports: total, Reasons: map[string]int{},
+			})
+		}
+		out[len(out)-1].Reasons[reason] = count
+	}
+	return out, rows.Err()
+}
+
+// ClearReports 는 관리자가 "문제없음" 으로 판단한 글의 신고를 모두 지운다. 이후 같은 사람이 다시 신고할 수 있다.
+func (s *Store) ClearReports(ctx context.Context, postID int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM reports WHERE post_id = ?`, postID)
+	return err
 }

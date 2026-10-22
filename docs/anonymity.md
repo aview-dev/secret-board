@@ -6,7 +6,7 @@ secret-board 의 목표는 "회사 사람만 쓸 수 있지만, 누가 썼는지
 
 ```
 브라우저 ──> portal (SvelteKit BFF)       ──X 신원 전달 안 함──> backend (Go)
-              └ auth.db: user, session                           └ board.db: posts, comments, votes
+              └ auth.db: user, session                           └ board.db: posts, comments, votes, reports
 ```
 
 - portal 은 "로그인한 회사 사람인지" 만 확인합니다.
@@ -30,6 +30,11 @@ secret-board 의 목표는 "회사 사람만 쓸 수 있지만, 누가 썼는지
    - 투표 시각은 저장하지 않고, `votes` 테이블은 `WITHOUT ROWID` 라 누른 순서도 남지 않는다.
    - 화면에는 개수와 "내가 누른 표" 만 보여준다. 누가 눌렀는지 보여주는 화면은 만들지 않는다.
 10. 글 / 댓글의 마크다운에서 이미지 문법은 렌더링하지 않는다 (`src/frontend/portal/src/lib/server/markdown.ts`). 외부 이미지를 허용하면 글쓴이가 자기 서버 이미지를 넣어 두고 읽는 사람의 IP 와 읽은 시각을 모을 수 있기 때문이다 (추적 픽셀). 링크는 `rel="noreferrer"` 로 열어 게시판 주소가 상대 사이트로 넘어가지 않게 한다. 링크를 누르는 순간 그 사이트는 누른 사람의 IP 를 보게 되므로, 링크는 누르는 사람이 판단한다.
+11. 신고는 계정당 글마다 한 번 집계된다. 규칙 9 와 같은 방식으로 reporter 해시 하나만 backend 에 보낸다.
+    - reporter = `HMAC(신고 키, userId:postId)` (hex). 신고 키는 투표 키와 용도 이름이 달라 따로 유도된다. 그래서 같은 사람의 voter 와 reporter 를 맞춰 볼 수 없다.
+    - 사유는 정해진 값 (`spam` / `abuse` / `privacy` / `other`) 만 받는다. 자유 입력은 사유 글에 신원이 드러날 수 있어서 받지 않는다.
+    - 신고 시각은 저장하지 않고, `reports` 테이블은 `WITHOUT ROWID` 라 신고한 순서도 남지 않는다.
+    - 관리자 신고 목록에는 글별 신고 개수와 사유별 개수만 보여준다. reporter 해시는 API 응답에도 넣지 않는다.
 
 ## 한계 (솔직하게)
 

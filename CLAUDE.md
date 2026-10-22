@@ -24,7 +24,7 @@ corelinesoft.com Google 계정만 로그인할 수 있는 사내 익명 게시�
 - backend 스키마, API 요청 / 응답, 로그에 사용자 식별자(이메일, user id, 세션 id, IP, User-Agent)를 넣지 않는다.
 - 요청 단위 접근 로그 미들웨어를 추가하지 않는다.
 - portal 에서 backend 로 사용자 정보를 전달하지 않는다. `locals.user` 는 로그인 여부 확인에만 쓴다.
-  - 예외: 투표 중복 방지용 voter 해시 (`lib/server/votes.ts`, 규칙 9). userId 자체는 보내지 않는다.
+  - 예외: 투표 / 신고 중복 방지용 voter / reporter 해시 (`lib/server/votes.ts`, 규칙 9, 11). userId 자체는 보내지 않는다.
 - 이런 요구가 들어오면 구현하기 전에 사용자에게 익명성 영향을 설명하고 확인받는다.
 
 ## 관례

@@ -1,19 +1,22 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import Clock from '@lucide/svelte/icons/clock';
+	import Flag from '@lucide/svelte/icons/flag';
 	import MessageSquare from '@lucide/svelte/icons/message-square';
 	import ThumbsDown from '@lucide/svelte/icons/thumbs-down';
 	import ThumbsUp from '@lucide/svelte/icons/thumbs-up';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 	import PanelHeader from '$lib/components/PanelHeader.svelte';
-	import { MAX_COMMENT_LEN, formatHour } from '$lib/board';
-	import { BUTTON_GHOST, BUTTON_PRIMARY, INPUT, PANEL } from '$lib/ui';
+	import { MAX_COMMENT_LEN, REPORT_REASONS, REPORT_REASON_LABEL, formatHour } from '$lib/board';
+	import { BUTTON_GHOST, BUTTON_OUTLINE, BUTTON_PRIMARY, INPUT, PANEL } from '$lib/ui';
 
 	let { data, form } = $props();
 	let submitting = $state(false);
 	let voting = $state(false);
 	let deleting = $state(false);
+	let reporting = $state(false);
+	let reportOpen = $state(false);
 	// 지우는 중인 댓글 id. 그 댓글의 버튼만 잠근다.
 	let deletingComment = $state<number | null>(null);
 
@@ -28,7 +31,9 @@
 <main class="mx-auto max-w-3xl space-y-4 px-4 py-8">
 	<Breadcrumb item={data.post.title} />
 
-	<article class={PANEL}>
+	<!-- PANEL 의 overflow-hidden 을 빼서 신고 창이 패널 밖으로 나와도 잘리지 않게 한다.
+	     article 안에는 배경색 있는 자식이 없어 모서리는 그대로 둥글다. -->
+	<article class="rounded-md border bg-panel">
 		<header class="border-b px-6 py-5">
 			<h1 class="text-xl font-semibold tracking-tight break-words">{data.post.title}</h1>
 			<p class="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -40,45 +45,84 @@
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 			{@html data.bodyHtml}
 		</div>
-		<form
-			method="POST"
-			action="?/vote"
-			use:enhance={() => {
-				voting = true;
-				return async ({ update }) => {
-					await update();
-					voting = false;
-				};
-			}}
-			class="flex flex-wrap items-center gap-2 border-t px-6 py-3"
-		>
-			<!-- 이미 누른 버튼을 다시 누르면 0 (취소) 을 보낸다. -->
-			<button
-				name="value"
-				value={data.myVote === 1 ? 0 : 1}
-				disabled={voting}
-				aria-pressed={data.myVote === 1}
-				title={data.myVote === 1 ? '좋아요 취소' : '좋아요'}
-				class="{VOTE_BUTTON} {data.myVote === 1 ? LIKE_ON : VOTE_IDLE}"
+		<!-- 투표 form 과 신고 form 을 한 줄에 둔다 (form 안에 form 을 넣을 수 없어서 div 로 감싼다). -->
+		<div class="flex flex-wrap items-center gap-2 border-t px-6 py-3">
+			<form
+				method="POST"
+				action="?/vote"
+				use:enhance={() => {
+					voting = true;
+					return async ({ update }) => {
+						await update();
+						voting = false;
+					};
+				}}
+				class="flex flex-wrap items-center gap-2"
 			>
-				<ThumbsUp />{data.post.likes}
-			</button>
-			<button
-				name="value"
-				value={data.myVote === -1 ? 0 : -1}
-				disabled={voting}
-				aria-pressed={data.myVote === -1}
-				title={data.myVote === -1 ? '싫어요 취소' : '싫어요'}
-				class="{VOTE_BUTTON} {data.myVote === -1 ? DISLIKE_ON : VOTE_IDLE}"
-			>
-				<ThumbsDown />{data.post.dislikes}
-			</button>
-			{#if form?.voteMessage}
-				<span class="text-xs text-error-fg">{form.voteMessage}</span>
-			{:else}
-				<span class="text-xs text-muted-foreground">누가 눌렀는지는 저장되지 않습니다.</span>
-			{/if}
-		</form>
+				<!-- 이미 누른 버튼을 다시 누르면 0 (취소) 을 보낸다. -->
+				<button
+					name="value"
+					value={data.myVote === 1 ? 0 : 1}
+					disabled={voting}
+					aria-pressed={data.myVote === 1}
+					title={data.myVote === 1 ? '좋아요 취소' : '좋아요'}
+					class="{VOTE_BUTTON} {data.myVote === 1 ? LIKE_ON : VOTE_IDLE}"
+				>
+					<ThumbsUp />{data.post.likes}
+				</button>
+				<button
+					name="value"
+					value={data.myVote === -1 ? 0 : -1}
+					disabled={voting}
+					aria-pressed={data.myVote === -1}
+					title={data.myVote === -1 ? '싫어요 취소' : '싫어요'}
+					class="{VOTE_BUTTON} {data.myVote === -1 ? DISLIKE_ON : VOTE_IDLE}"
+				>
+					<ThumbsDown />{data.post.dislikes}
+				</button>
+				{#if form?.voteMessage}
+					<span class="text-xs text-error-fg">{form.voteMessage}</span>
+				{:else}
+					<span class="text-xs text-muted-foreground">누가 눌렀는지는 저장되지 않습니다.</span>
+				{/if}
+			</form>
+			<details bind:open={reportOpen} class="relative ml-auto">
+				<summary class="{BUTTON_GHOST} list-none [&::-webkit-details-marker]:hidden">
+					<Flag />신고
+				</summary>
+				<form
+					method="POST"
+					action="?/report"
+					use:enhance={() => {
+						reporting = true;
+						return async ({ result, update }) => {
+							await update();
+							reporting = false;
+							if (result.type === 'success') reportOpen = false;
+						};
+					}}
+					class="absolute right-0 z-10 mt-1 w-56 space-y-2 rounded-md border bg-panel p-3 text-sm"
+				>
+					<p class="text-xs text-muted-foreground">
+						사유를 골라 주세요. 누가 신고했는지는 관리자도 알 수 없습니다.
+					</p>
+					{#each REPORT_REASONS as r (r)}
+						<label class="flex items-center gap-2">
+							<input type="radio" name="reason" value={r} required class="accent-primary" />
+							{REPORT_REASON_LABEL[r]}
+						</label>
+					{/each}
+					<button disabled={reporting} class="{BUTTON_OUTLINE} w-full">신고하기</button>
+				</form>
+			</details>
+		</div>
+		{#if form?.reportMessage}
+			<p class="border-t px-6 py-2 text-xs text-error-fg">{form.reportMessage}</p>
+		{:else if form?.reported}
+			<p class="border-t px-6 py-2 text-xs text-muted-foreground">
+				신고했습니다. 같은 글은 한 번만 집계되고, 다시 신고하면 사유만 바뀝니다.
+			</p>
+		{/if}
 		<!-- 관리자에게만 보인다. 버튼을 숨기는 건 화면 편의이고, 실제 권한 확인은 delete action 이 한다. -->
 		{#if data.me?.role === 'admin'}
 			<form
