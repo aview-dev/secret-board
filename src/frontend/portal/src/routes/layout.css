@@ -103,3 +103,88 @@
 		cursor: pointer;
 	}
 }
+
+/* 글 / 댓글 본문 (lib/server/markdown.ts 의 결과). tailwind 가 기본 스타일을 지우므로 필요한 것만 되살린다.
+   글자 크기는 감싸는 요소(text-base / text-sm)를 따르고, 제목만 em 으로 조금 키운다. */
+@layer components {
+	.markdown {
+		overflow-wrap: anywhere;
+
+		& > * + * {
+			margin-top: 0.75em;
+		}
+		& :is(h1, h2, h3, h4, h5, h6) {
+			font-weight: 600;
+			line-height: 1.3;
+		}
+		& h1 {
+			font-size: 1.4em;
+		}
+		& h2 {
+			font-size: 1.25em;
+		}
+		& h3 {
+			font-size: 1.1em;
+		}
+		& a {
+			color: var(--primary);
+			text-decoration: underline;
+			text-underline-offset: 2px;
+		}
+		& strong {
+			font-weight: 600;
+		}
+		& :is(ul, ol) {
+			padding-left: 1.5em;
+		}
+		& ul {
+			list-style: disc;
+		}
+		& ol {
+			list-style: decimal;
+		}
+		& li + li {
+			margin-top: 0.25em;
+		}
+		& blockquote {
+			border-left: 3px solid var(--border);
+			padding-left: 0.75em;
+			color: var(--muted-foreground);
+		}
+		& code {
+			border-radius: var(--radius-sm);
+			background: var(--muted);
+			padding: 0.1em 0.35em;
+			font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+			font-size: 0.9em;
+		}
+		& pre {
+			overflow-x: auto;
+			border: 1px solid var(--border);
+			border-radius: var(--radius-sm);
+			background: var(--muted);
+			padding: 0.75em 1em;
+			line-height: 1.5;
+		}
+		& pre code {
+			background: none;
+			padding: 0;
+		}
+		& hr {
+			border-top: 1px solid var(--border);
+		}
+		& table {
+			display: block;
+			overflow-x: auto;
+			border-collapse: collapse;
+		}
+		& :is(th, td) {
+			border: 1px solid var(--border);
+			padding: 0.35em 0.75em;
+		}
+		& th {
+			background: var(--panel-header);
+			font-weight: 600;
+		}
+	}
+}

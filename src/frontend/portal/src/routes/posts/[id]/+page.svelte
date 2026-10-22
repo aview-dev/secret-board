@@ -33,9 +33,10 @@
 				<Clock class="size-3.5" />{formatHour(data.post.createdAt)}
 			</p>
 		</header>
-		<!-- whitespace-pre-wrap: 줄바꿈을 그대로 보여준다. {@html} 을 쓰지 않으므로 HTML 은 글자로 나온다. -->
-		<div class="px-6 py-5 text-base leading-relaxed break-words whitespace-pre-wrap">
-			{data.post.body}
+		<!-- bodyHtml 은 lib/server/markdown.ts 가 만든 것만 온다 (원문 HTML 은 글자로 바뀐 상태). -->
+		<div class="markdown px-6 py-5 text-base leading-relaxed">
+			<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+			{@html data.bodyHtml}
 		</div>
 		<form
 			method="POST"
@@ -119,7 +120,10 @@
 							</span>
 							<span>{formatHour(c.createdAt)}</span>
 						</p>
-						<p class="mt-2 text-sm break-words whitespace-pre-wrap">{c.body}</p>
+						<div class="markdown mt-2 text-sm">
+							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+							{@html c.bodyHtml}
+						</div>
 					</li>
 				{/each}
 			</ul>
@@ -149,7 +153,7 @@
 			{/if}
 			<textarea
 				name="body"
-				placeholder="댓글을 적어 주세요"
+				placeholder="댓글을 적어 주세요 (마크다운 가능)"
 				aria-label="댓글"
 				required
 				maxlength={MAX_COMMENT_LEN}

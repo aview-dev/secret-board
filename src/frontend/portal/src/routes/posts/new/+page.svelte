@@ -67,7 +67,7 @@
 				<textarea
 					id="body"
 					name="body"
-					placeholder="내용을 적어 주세요"
+					placeholder="내용을 적어 주세요. 마크다운 (**굵게**, `코드`, - 목록, [링크](https://...)) 을 쓸 수 있습니다. 이미지는 보이지 않습니다."
 					required
 					maxlength={MAX_BODY_LEN}
 					rows="12"

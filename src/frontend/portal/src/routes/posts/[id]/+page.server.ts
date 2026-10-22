@@ -1,5 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { BackendError, createComment, deletePost, getPost, vote } from '$lib/server/backend';
+import { renderMarkdown } from '$lib/server/markdown';
 import { voterHash } from '$lib/server/votes';
 import { MAX_COMMENT_LEN } from '$lib/board';
 import type { Actions, PageServerLoad } from './$types';
@@ -13,12 +14,19 @@ function parseId(raw: string): number {
 // 로그인은 hooks 가 보장한다. userId 는 voter 해시를 만들 때만 쓰고 backend 로 보내지 않는다 (규칙 9).
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const id = parseId(params.id);
+	let data;
 	try {
-		return await getPost(id, voterHash(locals.user!.id, id));
+		data = await getPost(id, voterHash(locals.user!.id, id));
 	} catch (e) {
 		if (e instanceof BackendError && e.status === 404) error(404, '글을 찾을 수 없습니다.');
 		error(502, '게시판 서버에 연결할 수 없습니다.');
 	}
+	// 본문은 마크다운 원문 그대로 저장되어 있다. 보여줄 때마다 서버에서 HTML 로 바꾼다.
+	return {
+		...data,
+		bodyHtml: renderMarkdown(data.post.body ?? ''),
+		comments: data.comments.map((c) => ({ ...c, bodyHtml: renderMarkdown(c.body) }))
+	};
 };
 
 export const actions: Actions = {
