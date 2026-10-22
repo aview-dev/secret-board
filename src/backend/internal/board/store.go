@@ -199,6 +199,18 @@ func (s *Store) DeletePost(ctx context.Context, id int64) error {
 	return nil
 }
 
+// DeleteComment 는 글 postID 에 달린 댓글 하나를 지운다. 다른 글의 댓글 id 를 넘기면 ErrNotFound.
+func (s *Store) DeleteComment(ctx context.Context, postID, commentID int64) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM comments WHERE id = ? AND post_id = ?`, commentID, postID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // ListComments 는 오래된 댓글부터 돌려준다.
 func (s *Store) ListComments(ctx context.Context, postID int64) ([]Comment, error) {
 	rows, err := s.db.QueryContext(ctx,

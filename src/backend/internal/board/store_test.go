@@ -97,6 +97,31 @@ func TestDeletePostCascades(t *testing.T) {
 	}
 }
 
+func TestDeleteComment(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+
+	p1, _ := s.CreatePost(ctx, "글 1", "a")
+	p2, _ := s.CreatePost(ctx, "글 2", "b")
+	c1, _ := s.CreateComment(ctx, p1.ID, "지울 댓글")
+	c2, _ := s.CreateComment(ctx, p1.ID, "남을 댓글")
+
+	// 다른 글의 id 로는 지울 수 없다.
+	if err := s.DeleteComment(ctx, p2.ID, c1.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("wrong post: got %v, want ErrNotFound", err)
+	}
+	if err := s.DeleteComment(ctx, p1.ID, c1.ID); err != nil {
+		t.Fatal(err)
+	}
+	comments, _ := s.ListComments(ctx, p1.ID)
+	if len(comments) != 1 || comments[0].ID != c2.ID {
+		t.Fatalf("unexpected comments after delete: %+v", comments)
+	}
+	if err := s.DeleteComment(ctx, p1.ID, c1.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("delete twice: got %v, want ErrNotFound", err)
+	}
+}
+
 // 지운 글이 파일에 남지 않으려면 secure_delete 가 켜져 있어야 한다 (DSN).
 func TestSecureDeleteIsOn(t *testing.T) {
 	s := openTest(t)

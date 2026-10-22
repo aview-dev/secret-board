@@ -96,6 +96,28 @@ func TestDeletePost(t *testing.T) {
 	}
 }
 
+func TestDeleteComment(t *testing.T) {
+	h := newTestServer(t, "")
+
+	do := func(method, path, body string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(method, path, strings.NewReader(body)))
+		return rec
+	}
+
+	do("POST", "/api/v1/posts", `{"title":"t","body":"b"}`)
+	do("POST", "/api/v1/posts/1/comments", `{"body":"c"}`)
+	if rec := do("DELETE", "/api/v1/posts/1/comments/x", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("bad comment id: got %d", rec.Code)
+	}
+	if rec := do("DELETE", "/api/v1/posts/1/comments/1", ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("delete comment: got %d %s", rec.Code, rec.Body)
+	}
+	if rec := do("GET", "/api/v1/posts/1", ""); strings.Contains(rec.Body.String(), `"body":"c"`) {
+		t.Fatalf("comment still listed: %s", rec.Body)
+	}
+}
+
 func TestVote(t *testing.T) {
 	h := newTestServer(t, "")
 	voter := strings.Repeat("c", 64)

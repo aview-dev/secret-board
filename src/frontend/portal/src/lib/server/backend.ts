@@ -61,5 +61,9 @@ export const deletePost = (id: number) => call<unknown>('DELETE', `/api/v1/posts
 export const createComment = (postId: number, body: string) =>
 	call<Comment>('POST', `/api/v1/posts/${postId}/comments`, { body });
 
+// 관리자 삭제. deletePost 와 같다. 글 id 도 함께 보내 다른 글의 댓글이 지워지지 않게 한다.
+export const deleteComment = (postId: number, commentId: number) =>
+	call<unknown>('DELETE', `/api/v1/posts/${postId}/comments/${commentId}`);
+
 export const vote = (postId: number, voter: string, value: number) =>
 	call<Votes>('PUT', `/api/v1/posts/${postId}/vote`, { voter, value });

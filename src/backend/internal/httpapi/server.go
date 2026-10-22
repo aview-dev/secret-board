@@ -38,6 +38,7 @@ func NewServer(cfg Config) http.Handler {
 	api.HandleFunc("GET /api/v1/posts/{id}", h.getPost)
 	api.HandleFunc("DELETE /api/v1/posts/{id}", h.deletePost)
 	api.HandleFunc("POST /api/v1/posts/{id}/comments", h.createComment)
+	api.HandleFunc("DELETE /api/v1/posts/{id}/comments/{commentId}", h.deleteComment)
 	api.HandleFunc("PUT /api/v1/posts/{id}/vote", h.vote)
 	mux.Handle("/api/", requirePortalSecret(cfg.PortalSecret, api))
 
@@ -130,6 +131,23 @@ func (h *handlers) createComment(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, c)
 }
 
+// deleteComment 는 관리자 삭제용이다. deletePost 와 마찬가지로 누가 지우는지는 오지 않는다 (규칙 7).
+func (h *handlers) deleteComment(w http.ResponseWriter, r *http.Request) {
+	postID, ok := pathInt(w, r, "id")
+	if !ok {
+		return
+	}
+	commentID, ok := pathInt(w, r, "commentId")
+	if !ok {
+		return
+	}
+	if err := h.store.DeleteComment(r.Context(), postID, commentID); err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // vote 는 좋아요(1) / 싫어요(-1) / 취소(0) 를 받는다. voter 는 portal 이 만든 해시만 온다.
 func (h *handlers) vote(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r)
@@ -152,7 +170,12 @@ func (h *handlers) vote(w http.ResponseWriter, r *http.Request) {
 }
 
 func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	return pathInt(w, r, "id")
+}
+
+// pathInt 는 경로의 {name} 을 양의 정수로 읽는다. 아니면 404 를 쓰고 false.
+func pathInt(w http.ResponseWriter, r *http.Request, name string) (int64, bool) {
+	id, err := strconv.ParseInt(r.PathValue(name), 10, 64)
 	if err != nil || id <= 0 {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not_found"})
 		return 0, false

@@ -1,5 +1,12 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import { BackendError, createComment, deletePost, getPost, vote } from '$lib/server/backend';
+import {
+	BackendError,
+	createComment,
+	deleteComment,
+	deletePost,
+	getPost,
+	vote
+} from '$lib/server/backend';
 import { renderMarkdown } from '$lib/server/markdown';
 import { voterHash } from '$lib/server/votes';
 import { MAX_COMMENT_LEN } from '$lib/board';
@@ -76,5 +83,23 @@ export const actions: Actions = {
 			return fail(502, { deleteMessage: '글을 삭제할 수 없습니다.' });
 		}
 		redirect(303, '/');
+	},
+
+	// 관리자만. delete 와 같은 이유로 여기서 다시 확인한다.
+	deleteComment: async ({ params, request, locals }) => {
+		const id = parseId(params.id);
+		if (locals.role !== 'admin') error(403, '관리자만 삭제할 수 있습니다.');
+		const commentId = Number((await request.formData()).get('commentId'));
+		if (!Number.isSafeInteger(commentId) || commentId <= 0)
+			return fail(400, { commentDeleteMessage: '잘못된 요청입니다.' });
+
+		try {
+			await deleteComment(id, commentId);
+		} catch (e) {
+			// 그새 다른 관리자가 지웠다면 404. 목록만 다시 그리면 되므로 성공처럼 넘긴다.
+			if (e instanceof BackendError && e.status === 404) return { ok: true };
+			return fail(502, { commentDeleteMessage: '댓글을 삭제할 수 없습니다.' });
+		}
+		return { ok: true };
 	}
 };

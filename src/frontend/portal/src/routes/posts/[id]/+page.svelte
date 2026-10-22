@@ -14,6 +14,8 @@
 	let submitting = $state(false);
 	let voting = $state(false);
 	let deleting = $state(false);
+	// 지우는 중인 댓글 id. 그 댓글의 버튼만 잠근다.
+	let deletingComment = $state<number | null>(null);
 
 	// 고른 표는 색으로 구분한다. 좋아요는 강조색, 싫어요는 붉은 계열.
 	const VOTE_BUTTON =
@@ -114,12 +116,38 @@
 			<ul class="divide-y">
 				{#each data.comments as c, i (c.id)}
 					<li class="px-4 py-3">
-						<p class="flex items-center gap-2 text-xs text-muted-foreground">
+						<!-- div: 안에 form 이 들어가므로 p 를 쓸 수 없다. -->
+						<div class="flex items-center gap-2 text-xs text-muted-foreground">
 							<span class="rounded-sm border bg-muted px-1.5 py-0.5 font-medium text-foreground">
 								익명 {i + 1}
 							</span>
 							<span>{formatHour(c.createdAt)}</span>
-						</p>
+							{#if data.me?.role === 'admin'}
+								<form
+									method="POST"
+									action="?/deleteComment"
+									use:enhance={({ cancel }) => {
+										if (!confirm('이 댓글을 삭제할까요? 되돌릴 수 없습니다.')) return cancel();
+										deletingComment = c.id;
+										return async ({ update }) => {
+											await update();
+											deletingComment = null;
+										};
+									}}
+									class="ml-auto"
+								>
+									<input type="hidden" name="commentId" value={c.id} />
+									<button
+										disabled={deletingComment === c.id}
+										title="관리자 삭제"
+										aria-label="댓글 관리자 삭제"
+										class="{BUTTON_GHOST} h-6 px-1.5 hover:text-error-fg [&_svg]:size-3.5"
+									>
+										<Trash2 />
+									</button>
+								</form>
+							{/if}
+						</div>
 						<div class="markdown mt-2 text-sm">
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 							{@html c.bodyHtml}
@@ -129,6 +157,9 @@
 			</ul>
 		{:else}
 			<p class="px-4 py-6 text-center text-sm text-muted-foreground">첫 댓글을 남겨 보세요.</p>
+		{/if}
+		{#if form?.commentDeleteMessage}
+			<p class="border-t px-4 py-2 text-xs text-error-fg">{form.commentDeleteMessage}</p>
 		{/if}
 
 		<form
